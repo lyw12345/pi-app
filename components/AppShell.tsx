@@ -283,6 +283,11 @@ export function AppShell() {
     }
   }, [ensureWorkbenchCwd, resetChatChrome, router]);
 
+  const handleOpenSceneById = useCallback((sceneId: string) => {
+    const scene = getSceneById(sceneId);
+    if (scene) handleOpenScene(scene);
+  }, [handleOpenScene]);
+
   const handleOpenHistoryItem = useCallback((item: ProductHistoryItem) => {
     setNewSessionCwd(null);
     setSelectedSession({
@@ -726,6 +731,7 @@ export function AppShell() {
               <WorkbenchSettings
                 onOpenModels={() => setModelsConfigOpen(true)}
                 onOpenSkills={() => setSkillsConfigOpen(true)}
+                onOpenSceneId={handleOpenSceneById}
                 skillsDisabled={settingsSkillsDisabled}
               />
             ) : (
