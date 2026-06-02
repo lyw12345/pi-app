@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useI18n } from "@/lib/i18n/provider";
 import type { SessionInfo } from "@/lib/types";
 import { FileExplorer } from "./FileExplorer";
 
@@ -8,6 +9,8 @@ interface Props {
   selectedSessionId: string | null;
   onSelectSession: (session: SessionInfo, isRestore?: boolean) => void;
   onNewSession?: (sessionId: string, cwd: string) => void;
+  onOpenSettings?: () => void;
+  isSettingsView?: boolean;
   initialSessionId?: string | null;
   onInitialRestoreDone?: () => void;
   refreshKey?: number;
@@ -19,17 +22,17 @@ interface Props {
   onAtMention?: (relativePath: string) => void;
 }
 
-function formatRelativeTime(dateStr: string): string {
+function formatRelativeTime(dateStr: string, t: ReturnType<typeof useI18n>["t"]): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const mins = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
+  if (mins < 1) return t("sessionSidebar.justNow");
+  if (mins < 60) return t("sessionSidebar.minutesAgo", { count: mins });
+  if (hours < 24) return t("sessionSidebar.hoursAgo", { count: hours });
+  if (days < 7) return t("sessionSidebar.daysAgo", { count: days });
   return date.toLocaleDateString();
 }
 
@@ -154,11 +157,14 @@ function useScramble(target: string, running: boolean): string {
 }
 
 function PiAgentTitle() {
+  const { t } = useI18n();
   const [showVersion, setShowVersion] = useState(false);
   const [scrambling, setScrambling] = useState(false);
   const revertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const target = showVersion ? `${process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}p${process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}` : "Pi Agent Web";
+  const target = showVersion
+    ? `${process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}p${process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}`
+    : t("sessionSidebar.title");
   const display = useScramble(target, scrambling);
 
   const triggerScramble = useCallback((toVersion: boolean) => {
@@ -196,7 +202,8 @@ function PiAgentTitle() {
   );
 }
 
-export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention }: Props) {
+export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, onOpenSettings, isSettingsView = false, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention }: Props) {
+  const { t, locale } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -365,7 +372,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 flexShrink: 0,
                 transition: "background 0.12s, color 0.12s, border-color 0.12s",
               }}
-              title={selectedCwd ? `New session in ${selectedCwd}` : "Select a project first"}
+              title={selectedCwd ? t("sessionSidebar.newSessionIn", { cwd: selectedCwd }) : t("sessionSidebar.selectProjectFirst")}
               onMouseEnter={(e) => {
                 if (!selectedCwd) return;
                 e.currentTarget.style.background = "var(--bg-selected)";
@@ -382,7 +389,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 <line x1="6" y1="1" x2="6" y2="11" />
                 <line x1="1" y1="6" x2="11" y2="6" />
               </svg>
-              New
+              {t("sessionSidebar.newSession")}
             </button>
             <button
               onClick={() => loadSessions(false)}
@@ -410,7 +417,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 e.currentTarget.style.color = "var(--text-muted)";
                 e.currentTarget.style.borderColor = "var(--border)";
               }}
-              title="Refresh"
+              title={t("sessionSidebar.refresh")}
             >
               {sessionRefreshDone ? (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -457,7 +464,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               }}
               title={selectedCwd ?? ""}
             >
-              {selectedCwd ? shortenCwd(selectedCwd, homeDir) : (initialSessionId && !restoredRef.current ? "" : "Select project…")}
+              {selectedCwd ? shortenCwd(selectedCwd, homeDir) : (initialSessionId && !restoredRef.current ? "" : t("sessionSidebar.selectProject"))}
             </span>
           </button>
 
@@ -537,7 +544,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                     <path d="M1 3A1 1 0 0 1 2 2H4L5 3.5H8.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 1 8V3Z" />
                   </svg>
-                  <span>Use default directory</span>
+                  <span>{t("sessionSidebar.useDefaultDirectory")}</span>
                 </button>
               )}
 
@@ -567,7 +574,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                     <line x1="5" y1="1" x2="5" y2="9" />
                     <line x1="1" y1="5" x2="9" y2="5" />
                   </svg>
-                  <span>Custom path…</span>
+                  <span>{t("sessionSidebar.customPath")}</span>
                 </button>
               ) : (
                 <div style={{ padding: "6px 8px", borderTop: recentCwds.length > 0 ? "none" : undefined }}>
@@ -582,7 +589,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                         setCustomPathValue("");
                       }
                     }}
-                    placeholder="/path/to/project"
+                    placeholder={t("sessionSidebar.customPathPlaceholder")}
                     style={{
                       width: "100%",
                       fontSize: 11,
@@ -611,7 +618,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                         cursor: "pointer",
                       }}
                     >
-                      Open
+                      {t("sessionSidebar.open")}
                     </button>
                     <button
                       onClick={() => { setCustomPathOpen(false); setCustomPathValue(""); }}
@@ -626,7 +633,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                         cursor: "pointer",
                       }}
                     >
-                      Cancel
+                      {t("sessionSidebar.cancel")}
                     </button>
                   </div>
                 </div>
@@ -640,7 +647,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       <div style={{ flex: explorerOpen && (selectedCwdProp || selectedCwd) ? "1 1 0" : "1 1 auto", overflowY: "auto", padding: "0", minHeight: 80 }}>
         {loading && (
           <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
-            Loading...
+            {t("sessionSidebar.loading")}
           </div>
         )}
         {error && (
@@ -650,7 +657,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         )}
         {!loading && !error && filteredSessions.length === 0 && (
           <div style={{ padding: "16px 14px", color: "var(--text-muted)", fontSize: 12 }}>
-            No sessions found
+            {t("sessionSidebar.noSessionsFound")}
           </div>
         )}
         {sessionTree.map((node) => (
@@ -708,7 +715,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               >
                 <polyline points="3 2 7 5 3 8" />
               </svg>
-              Explorer
+              {t("sessionSidebar.explorer")}
             </button>
             <button
               onClick={() => {
@@ -717,7 +724,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 if (explorerRefreshTimerRef.current) clearTimeout(explorerRefreshTimerRef.current);
                 explorerRefreshTimerRef.current = setTimeout(() => setExplorerRefreshDone(false), 2000);
               }}
-              title="Refresh explorer"
+              title={t("sessionSidebar.refreshExplorer")}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 26, height: 26, padding: 0, marginRight: 6,
@@ -756,6 +763,52 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           )}
         </div>
       )}
+
+      <div
+        style={{
+          borderTop: "1px solid var(--border)",
+          padding: "10px",
+          flexShrink: 0,
+        }}
+      >
+        <button
+          onClick={onOpenSettings}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            width: "100%",
+            height: 34,
+            padding: "0 10px",
+            background: isSettingsView ? "var(--bg-selected)" : "var(--bg-hover)",
+            border: `1px solid ${isSettingsView ? "color-mix(in srgb, var(--accent) 35%, var(--border))" : "var(--border)"}`,
+            borderRadius: 8,
+            color: isSettingsView ? "var(--text)" : "var(--text-muted)",
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 500,
+            transition: "background 0.12s, color 0.12s, border-color 0.12s",
+          }}
+          onMouseEnter={(event) => {
+            if (isSettingsView) return;
+            event.currentTarget.style.background = "var(--bg-selected)";
+            event.currentTarget.style.color = "var(--text)";
+            event.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 35%, var(--border))";
+          }}
+          onMouseLeave={(event) => {
+            if (isSettingsView) return;
+            event.currentTarget.style.background = "var(--bg-hover)";
+            event.currentTarget.style.color = "var(--text-muted)";
+            event.currentTarget.style.borderColor = "var(--border)";
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.58.92.94 1.51 1H21a2 2 0 1 1 0 4h-.09c-.59.06-1.15.43-1.51 1Z" />
+          </svg>
+          <span>{t("common.settings")}</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -844,6 +897,7 @@ function SessionItem({
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
+  const { t, locale } = useI18n();
   const [hovered, setHovered] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -929,7 +983,9 @@ function SessionItem({
         /* ── Delete confirmation: same height, two flat buttons ── */
         <>
           <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            Delete <span style={{ fontWeight: 600 }}>&ldquo;{title.slice(0, 22)}{title.length > 22 ? "…" : ""}&rdquo;</span>?
+            {t("sessionSidebar.deleteSessionPrompt", {
+              name: `${title.slice(0, 22)}${title.length > 22 ? "…" : ""}`,
+            })}
           </div>
           <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
             <button
@@ -949,7 +1005,7 @@ function SessionItem({
                 <path d="M10 11v6M14 11v6" />
                 <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
               </svg>
-              Delete
+              {t("sessionSidebar.delete")}
             </button>
             <button
               onClick={handleDeleteCancel}
@@ -962,7 +1018,7 @@ function SessionItem({
                 whiteSpace: "nowrap",
               }}
             >
-              Cancel
+              {t("sessionSidebar.cancel")}
             </button>
           </div>
         </>
@@ -1018,8 +1074,8 @@ function SessionItem({
               {title}
             </div>
             <div style={{ marginTop: 2, display: "flex", gap: 8, color: "var(--text-dim)", fontSize: 11 }}>
-              <span title={session.modified}>{formatRelativeTime(session.modified)}</span>
-              <span>{session.messageCount} msgs</span>
+              <span title={new Date(session.modified).toLocaleString(locale)}>{formatRelativeTime(session.modified, t)}</span>
+              <span>{t("sessionSidebar.messagesCount", { count: session.messageCount })}</span>
             </div>
           </div>
 
@@ -1027,7 +1083,7 @@ function SessionItem({
           {hasChildren && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleCollapse?.(); }}
-              title={collapsed ? "Expand forks" : "Collapse forks"}
+              title={collapsed ? t("sessionSidebar.expandForks") : t("sessionSidebar.collapseForks")}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 20, height: 20, padding: 0, flexShrink: 0,
@@ -1048,7 +1104,7 @@ function SessionItem({
             <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
               <button
                 onClick={startRename}
-                title="Rename"
+                title={t("sessionSidebar.rename")}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 32, height: 32, padding: 0,
@@ -1074,7 +1130,7 @@ function SessionItem({
               </button>
               <button
                 onClick={handleDeleteClick}
-                title="Delete"
+                title={t("sessionSidebar.delete")}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 32, height: 32, padding: 0,

@@ -11,6 +11,9 @@ try {
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@earendil-works/pi-coding-agent", "@earendil-works/pi-ai"],
+  devIndicators: process.env.NODE_ENV === "development" ? {
+    position: "bottom-right",
+  } : false,
   turbopack: {
     root: __dirname,
   },
