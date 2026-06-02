@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useI18n } from "@/lib/i18n/provider";
 import { getFileIcon, FolderIcon } from "./FileIcons";
 import { encodeFilePathForApi, getRelativeFilePath, joinFilePath } from "@/lib/file-paths";
 
@@ -61,6 +62,7 @@ function TreeNode({
   onToggleExpanded: (fullPath: string, open: boolean) => void;
   refreshKey?: number;
 }) {
+  const { t } = useI18n();
   const open = expandedPaths.has(node.fullPath);
   const [children, setChildren] = useState<FileNode[]>(node.children ?? []);
   const [loaded, setLoaded] = useState(node.loaded ?? false);
@@ -162,7 +164,7 @@ function TreeNode({
               e.stopPropagation();
               onAtMention(getRelativeFilePath(node.fullPath, cwd));
             }}
-            title="Insert path into chat"
+            title={t("fileExplorer.insertPathIntoChat")}
             style={{
               position: "absolute",
               right: 4,
@@ -188,7 +190,7 @@ function TreeNode({
               <circle cx="12" cy="12" r="4" />
               <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
             </svg>
-            mention
+            {t("fileExplorer.mention")}
           </button>
         )}
       </div>
@@ -199,7 +201,7 @@ function TreeNode({
           ))}
           {children.length === 0 && loaded && (
             <div style={{ paddingLeft: 8 + (depth + 1) * 14, fontSize: 11, color: "var(--text-dim)", height: 22, display: "flex", alignItems: "center" }}>
-              empty
+              {t("fileExplorer.empty")}
             </div>
           )}
         </div>
@@ -209,6 +211,7 @@ function TreeNode({
 }
 
 export function FileExplorer({ cwd, onOpenFile, refreshKey, onAtMention }: Props) {
+  const { t } = useI18n();
   const [roots, setRoots] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -241,7 +244,7 @@ export function FileExplorer({ cwd, onOpenFile, refreshKey, onAtMention }: Props
   if (loading) {
     return (
       <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-dim)" }}>
-        Loading files...
+        {t("fileExplorer.loadingFiles")}
       </div>
     );
   }
@@ -271,7 +274,7 @@ export function FileExplorer({ cwd, onOpenFile, refreshKey, onAtMention }: Props
       ))}
       {roots.length === 0 && (
         <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-dim)" }}>
-          No files found
+          {t("fileExplorer.noFilesFound")}
         </div>
       )}
     </div>

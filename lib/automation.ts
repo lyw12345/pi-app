@@ -1,4 +1,5 @@
 import { getActionsForScene, getSceneById } from "./scenes";
+import { sanitizePromptInput } from "./prompt-guard";
 
 export type AutomationTrigger = "manual";
 
@@ -77,14 +78,18 @@ export function buildAutomationRunPrompt(entry: AutomationEntry, run: Automation
         .map((action) => `- ${action.label}: ${action.description}`)
         .join("\n")
     : "";
-  const input = run.input?.trim() || entry.defaultInput;
+  const input = sanitizePromptInput(run.input ?? entry.defaultInput, { onTruncate: "marker" });
+  const requestedBy = sanitizePromptInput(run.requestedBy ?? "current user", {
+    maxChars: 120,
+    onTruncate: "ellipsis",
+  });
 
   return [
     `Automation: ${entry.name}`,
     `Scene: ${sceneName}`,
     "Trigger: Manual",
     `Cadence: ${entry.cadenceLabel}`,
-    `Requested by: ${run.requestedBy?.trim() || "current user"}`,
+    `Requested by: ${requestedBy || "current user"}`,
     "",
     "Automation goal:",
     entry.description,

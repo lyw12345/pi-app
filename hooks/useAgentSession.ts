@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect, useReducer } from "react";
 import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
 import { normalizeToolCalls } from "@/lib/normalize";
 import { sendAgentCommand } from "@/lib/agent-client";
-import type { ToolEntry } from "@/components/ToolPanel";
+import { getPresetFromTools, PRESET_DEFAULT, PRESET_FULL, PRESET_NONE, type ToolEntry } from "@/components/ToolPanel";
 import type { Scene } from "@/lib/scenes";
 
 export interface SessionData {
@@ -207,7 +207,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     try {
       const tools = await sendAgentCommand<ToolEntry[]>(sid, { type: "get_tools" });
       if (tools) {
-        const { getPresetFromTools } = await import("@/components/ToolPanel");
         setToolPresetState(getPresetFromTools(tools));
       }
     } catch (e) {
@@ -355,7 +354,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (isNew && newSessionCwd) {
         const selectedModel = newSessionModel;
         if (selectedModel) setPendingModel(selectedModel);
-        const { PRESET_NONE, PRESET_DEFAULT, PRESET_FULL } = await import("@/components/ToolPanel");
         const toolNames = toolPreset === "none" ? PRESET_NONE : toolPreset === "default" ? PRESET_DEFAULT : PRESET_FULL;
         const res = await fetch(scene ? `/api/scenes/${encodeURIComponent(scene.id)}/launch` : "/api/agent/new", {
           method: "POST",
@@ -538,7 +536,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   }, []);
 
   const handleToolPresetChange = useCallback(async (preset: "none" | "default" | "full") => {
-    const { PRESET_NONE, PRESET_DEFAULT, PRESET_FULL } = await import("@/components/ToolPanel");
     const toolNames = preset === "none" ? PRESET_NONE : preset === "default" ? PRESET_DEFAULT : PRESET_FULL;
     setToolPresetState(preset);
     const sid = sessionIdRef.current;

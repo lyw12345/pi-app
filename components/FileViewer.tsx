@@ -7,6 +7,7 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTheme } from "@/hooks/useTheme";
+import { useI18n } from "@/lib/i18n/provider";
 import { encodeFilePathForApi, getFileName, getRelativeFilePath } from "@/lib/file-paths";
 
 interface Props {
@@ -116,6 +117,7 @@ function diffLines(oldLines: string[], newLines: string[]): DiffLine[] {
 }
 
 function DiffView({ oldContent, newContent }: { oldContent: string; newContent: string; language: string }) {
+  const { t } = useI18n();
   const oldLines = oldContent.split("\n");
   const newLines = newContent.split("\n");
   const diff = diffLines(oldLines, newLines);
@@ -124,7 +126,7 @@ function DiffView({ oldContent, newContent }: { oldContent: string; newContent: 
   if (!hasChanges) {
     return (
       <div style={{ padding: "12px 16px", fontSize: 12, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
-        No changes
+        {t("fileViewer.noChanges")}
       </div>
     );
   }
@@ -188,7 +190,7 @@ function DiffView({ oldContent, newContent }: { oldContent: string; newContent: 
                 borderBottom: "1px solid var(--border)",
               }}
             >
-              ... {seg.count} unchanged lines ...
+              {t("fileViewer.unchangedLines", { count: seg.count })}
             </div>
           );
           diffIdx += seg.count;
@@ -271,6 +273,7 @@ function DiffView({ oldContent, newContent }: { oldContent: string; newContent: 
 }
 
 function ImageViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
+  const { t } = useI18n();
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
   const [size, setSize] = useState<number | null>(null);
@@ -336,11 +339,11 @@ function ImageViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
         <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
           {getRelativeFilePath(filePath, cwd)}
         </span>
-        <span style={{ marginLeft: "auto" }}>{ext || "image"}</span>
+        <span style={{ marginLeft: "auto" }}>{ext || t("fileViewer.image")}</span>
         {naturalSize && <span>{naturalSize.w} × {naturalSize.h}</span>}
         {formatSizeStr && <span>{formatSizeStr}</span>}
         <span
-          title={watching ? "Live sync active" : "Not watching"}
+          title={watching ? t("fileViewer.liveSyncActive") : t("fileViewer.notWatching")}
           style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
         >
           <span
@@ -353,7 +356,7 @@ function ImageViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
               boxShadow: watching ? "0 0 4px #4ade80" : "none",
             }}
           />
-          {watching ? "live" : "static"}
+          {watching ? t("fileViewer.live") : t("fileViewer.static")}
         </span>
       </div>
       <div
@@ -382,7 +385,7 @@ function ImageViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
               const img = e.currentTarget;
               setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
             }}
-            onError={() => setError("Failed to load image")}
+            onError={() => setError(t("fileViewer.failedToLoadImage"))}
             style={{
               maxWidth: "100%",
               maxHeight: "100%",
@@ -405,6 +408,7 @@ function formatDuration(seconds: number): string {
 }
 
 function AudioViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
+  const { t } = useI18n();
   const [watching, setWatching] = useState(false);
   const [bust, setBust] = useState(0);
   const [size, setSize] = useState<number | null>(null);
@@ -470,11 +474,11 @@ function AudioViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
         <span style={{ fontFamily: "var(--font-mono)" }} title={filePath}>
           {getRelativeFilePath(filePath, cwd)}
         </span>
-        <span style={{ marginLeft: "auto" }}>{ext || "audio"}</span>
+        <span style={{ marginLeft: "auto" }}>{ext || t("fileViewer.audio")}</span>
         {duration != null && <span>{formatDuration(duration)}</span>}
         {size != null && <span>{formatSize(size)}</span>}
         <span
-          title={watching ? "Live sync active" : "Not watching"}
+          title={watching ? t("fileViewer.liveSyncActive") : t("fileViewer.notWatching")}
           style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
         >
           <span
@@ -487,7 +491,7 @@ function AudioViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
               boxShadow: watching ? "0 0 4px #4ade80" : "none",
             }}
           />
-          {watching ? "live" : "static"}
+          {watching ? t("fileViewer.live") : t("fileViewer.static")}
         </span>
       </div>
       <div
@@ -512,7 +516,7 @@ function AudioViewer({ filePath, cwd }: { filePath: string; cwd?: string }) {
             preload="metadata"
             src={src}
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-            onError={() => setError("Failed to load audio")}
+            onError={() => setError(t("fileViewer.failedToLoadAudio"))}
             style={{ width: "100%" }}
           />
         </div>
@@ -533,6 +537,7 @@ export function FileViewer({ filePath, cwd }: Props) {
 
 function TextFileViewer({ filePath, cwd }: Props) {
   const { isDark } = useTheme();
+  const { t } = useI18n();
   const [data, setData] = useState<FileData | null>(null);
   const [prevContent, setPrevContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -621,7 +626,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
   if (loading) {
     return (
       <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: 13 }}>
-        Loading...
+        {t("fileViewer.loading")}
       </div>
     );
   }
@@ -666,7 +671,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
 
         {/* Live watch indicator */}
         <span
-          title={watching ? "Live sync active" : "Not watching"}
+          title={watching ? t("fileViewer.liveSyncActive") : t("fileViewer.notWatching")}
           style={{ display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)" }}
         >
           <span
@@ -679,7 +684,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
               boxShadow: watching ? "0 0 4px #4ade80" : "none",
             }}
           />
-          {watching ? "live" : "static"}
+          {watching ? t("fileViewer.live") : t("fileViewer.static")}
         </span>
 
         {/* Diff / Source toggle — shown only when there are changes */}
@@ -694,7 +699,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
                 fontWeight: viewMode === "source" ? 600 : 400,
               }}
             >
-              Source
+              {t("fileViewer.source")}
             </button>
             <button
               onClick={() => setViewMode("diff")}
@@ -705,7 +710,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
                 fontWeight: viewMode === "diff" ? 600 : 400,
               }}
             >
-              Diff {changeCount > 0 && <span style={{ color: "#4ade80", marginLeft: 2 }}>+{changeCount}</span>}
+              {t("fileViewer.diff")} {changeCount > 0 && <span style={{ color: "#4ade80", marginLeft: 2 }}>+{changeCount}</span>}
             </button>
           </div>
         )}
@@ -714,7 +719,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
         {viewMode === "source" && !previewMode && (
           <button
             onClick={() => setWrapLines((v) => !v)}
-            title={wrapLines ? "Disable word wrap" : "Enable word wrap"}
+            title={wrapLines ? t("fileViewer.disableWordWrap") : t("fileViewer.enableWordWrap")}
             style={{
               padding: "2px 8px", fontSize: 11, cursor: "pointer",
               background: wrapLines ? "var(--bg-selected)" : "var(--bg-hover)",
@@ -723,7 +728,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
               fontWeight: wrapLines ? 600 : 400,
             }}
           >
-            wrap
+            {t("fileViewer.wrap")}
           </button>
         )}
 
@@ -739,7 +744,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
                 fontWeight: !previewMode ? 600 : 400,
               }}
             >
-              Code
+              {t("fileViewer.code")}
             </button>
             <button
               onClick={() => setPreviewMode(true)}
@@ -750,7 +755,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
                 fontWeight: previewMode ? 600 : 400,
               }}
             >
-              Preview
+              {t("fileViewer.preview")}
             </button>
           </div>
         )}
@@ -767,7 +772,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
                 fontWeight: previewMode ? 600 : 400,
               }}
             >
-              Preview
+              {t("fileViewer.preview")}
             </button>
             <button
               onClick={() => setPreviewMode(false)}
@@ -778,7 +783,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
                 fontWeight: !previewMode ? 600 : 400,
               }}
             >
-              Raw
+              {t("fileViewer.raw")}
             </button>
           </div>
         )}
@@ -793,7 +798,7 @@ function TextFileViewer({ filePath, cwd }: Props) {
             srcDoc={data.content}
             sandbox="allow-scripts"
             style={{ width: "100%", height: "100%", border: "none", background: "var(--bg)" }}
-            title="HTML preview"
+            title={t("fileViewer.htmlPreview")}
           />
         ) : isMarkdown && previewMode ? (
           <div

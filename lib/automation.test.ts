@@ -35,4 +35,21 @@ describe("automation entries", () => {
     expect(prompt).toContain("Use revenue, churn, and launch notes from this week.");
     expect(prompt).toContain("Expected output:");
   });
+
+  it("sanitizes control characters and oversized inputs before they reach the prompt", () => {
+    const entry = getAutomationById("customer-follow-up-draft");
+    expect(entry).not.toBeNull();
+
+    const prompt = buildAutomationRunPrompt(entry!, {
+      input: "hi\u0000there " + "y".repeat(20_000) + "\u007F",
+      requestedBy: "alice\u0001@example.com",
+    });
+
+    expect(prompt).not.toContain("\u0000");
+    expect(prompt).not.toContain("\u0001");
+    expect(prompt).not.toContain("\u007F");
+    expect(prompt).toMatch(/\[truncated \d+ chars\]$/m);
+    expect(prompt).toContain("Requested by: alice@example.com");
+    expect(prompt.length).toBeLessThan(20_000);
+  });
 });

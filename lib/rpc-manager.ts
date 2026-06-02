@@ -1,4 +1,4 @@
-import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, DEFAULT_COMPACTION_SETTINGS, findCutPoint, getAgentDir, SessionManager } from "@earendil-works/pi-coding-agent";
 import { cacheSessionPath } from "./session-reader";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 
@@ -163,7 +163,6 @@ export class AgentSessionWrapper {
       case "compact": {
         // pi's compact() does not guard against empty messagesToSummarize — use findCutPoint
         // to pre-check and throw a clean error instead of generating a useless empty summary.
-        const { findCutPoint, DEFAULT_COMPACTION_SETTINGS } = await import("@earendil-works/pi-coding-agent");
         const pathEntries = this.inner.sessionManager.getBranch() as Array<{ type: string }>;
         const settings = { ...DEFAULT_COMPACTION_SETTINGS, ...this.inner.settingsManager.getCompactionSettings() };
         let prevCompactionIndex = -1;
@@ -286,7 +285,6 @@ export async function startRpcSession(
   if (inflight) return inflight;
 
   const starting = (async () => {
-    const { SessionManager, getAgentDir } = await import("@earendil-works/pi-coding-agent");
     const agentDir = getAgentDir();
 
     const sessionManager = sessionFile
