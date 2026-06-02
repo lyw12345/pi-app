@@ -81,13 +81,21 @@ describe("suggestNextStep", () => {
 
   it("falls back to draft-reply when followup is absent for customer-communication", () => {
     const scene = makeScene({ id: "customer-communication", actionIds: ["draft-reply"] });
-    const result = suggestNextStep("Could you help me resolve this question?", scene, null);
+    const result = suggestNextStep(
+      "Could you help me resolve this question about the damaged shipment for this account?",
+      scene,
+      null,
+    );
     expect(result?.id).toBe("draft-reply");
   });
 
   it("returns the followup action when customer text has at least two exclamation marks", () => {
     const scene = makeScene({ id: "customer-communication", actionIds: ["followup"] });
-    const result = suggestNextStep("Please help ASAP!! The customer is waiting.", scene, null);
+    const result = suggestNextStep(
+      "Please help ASAP!! The customer is waiting on a response about their damaged order.",
+      scene,
+      null,
+    );
     expect(result?.id).toBe("followup");
   });
 

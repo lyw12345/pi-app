@@ -107,6 +107,14 @@ const ACTIONS: SceneAction[] = [
     enabled: true,
   },
   {
+    id: "followup",
+    label: "Follow-up reply",
+    type: "prompt",
+    description: "Generate a concise follow-up based on the latest exchange.",
+    requiresInput: true,
+    enabled: true,
+  },
+  {
     id: "next-step-plan",
     label: "Next-step plan",
     type: "prompt",

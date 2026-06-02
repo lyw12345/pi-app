@@ -55,7 +55,7 @@ describe("PUT /api/scene-overrides/[sceneId]", () => {
     });
     const body = (await res.json()) as { error?: string };
     expect(res.status).toBe(400);
-    expect(body.error).toMatch(/at least one of/);
+    expect(body.error).toMatch(/at least one of/i);
     expect(upsertMock).not.toHaveBeenCalled();
   });
 

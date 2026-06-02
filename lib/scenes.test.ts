@@ -89,24 +89,8 @@ describe("scene launch mapping", () => {
   it("returns the static scene when no override is present", () => {
     const scene = getSceneById("report-generation");
     expect(scene).not.toBeNull();
-    const direct = mergeSceneWithOverride(
-      {
-        id: "report-generation",
-        name: "x",
-        description: "y",
-        category: "z",
-        entryMode: "chat",
-        defaultPrompt: "static prompt",
-        sourceIds: [],
-        actionIds: [],
-        outputStyle: "static style",
-        suggestedStarters: [],
-        status: "active",
-      },
-      null,
-    );
-    expect(direct).toMatchObject({ defaultPrompt: "static prompt", outputStyle: "static style" });
-    expect(scene?.defaultPrompt).toBe(direct.defaultPrompt);
+    const direct = mergeSceneWithOverride(scene!, null);
+    expect(direct).toEqual(scene);
   });
 
   it("merges an override and treats null as 'keep static'", () => {
