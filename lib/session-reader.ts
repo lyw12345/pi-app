@@ -2,7 +2,7 @@ import { SessionManager, buildSessionContext as piBuildSessionContext, getAgentD
 import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage } from "./types";
 import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } from "@earendil-works/pi-coding-agent";
 import { normalizeToolCalls } from "./normalize";
-import { readProductSessionMetadata } from "./scene-metadata";
+import { readProductSessionMetadataMap } from "./scene-metadata";
 import { getSceneById } from "./scenes";
 
 export { getAgentDir };
@@ -15,7 +15,7 @@ export async function listAllSessions(): Promise<SessionInfo[]> {
   const piSessions: PiSessionInfo[] = await SessionManager.listAll();
   const pathToId = new Map<string, string>();
   for (const s of piSessions) pathToId.set(s.path, s.id);
-  const productMetadata = readProductSessionMetadata();
+  const productMetadata = readProductSessionMetadataMap();
 
   const cache = getPathCache();
   return piSessions.map((s) => {

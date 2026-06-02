@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
+import fs, { readdirSync } from "fs";
+import os from "os";
 import path from "path";
 import { listAllSessions } from "@/lib/session-reader";
 import { filePathFromSegments, isPathAllowed, parseByteRange } from "@/lib/file-access";
@@ -98,8 +99,7 @@ async function getAllowedRoots(): Promise<Set<string>> {
     if (s.cwd) roots.add(s.cwd);
   }
   // Also allow ~/pi-cwd-* directories created by the default-cwd endpoint
-  const home = (await import("os")).homedir();
-  const { readdirSync } = await import("fs");
+  const home = os.homedir();
   try {
     for (const name of readdirSync(home)) {
       if (/^pi-cwd-\d{8}$/.test(name)) {

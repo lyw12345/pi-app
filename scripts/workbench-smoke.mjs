@@ -1,3 +1,20 @@
+// scripts/workbench-smoke.mjs
+//
+// End-to-end smoke test for the enterprise workbench slices. Exercises:
+//   1. Workbench home: scene cards render.
+//   2. Scene launch: starter prompt is inserted into the chat input.
+//   3. Settings: usage + automation panels render and prepare a run.
+//   4. API: /api/usage, /api/automation, /api/automation/run shape.
+//
+// Run locally (with `npm run dev` on port 30141 first):
+//   npm run test:workbench
+// Or against a deployed URL:
+//   PI_WEB_BASE_URL=https://staging.example.com npm run test:workbench
+//
+// CI integration notes (see docs/superpowers/ci/smoke.md):
+//   - Requires Playwright browsers: `npx playwright install chromium`
+//   - Requires the dev server: `npm run dev` or a started build
+//   - The script fails fast on any browser console error or page error.
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium } from "playwright";

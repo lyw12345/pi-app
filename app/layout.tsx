@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans_Mono } from "next/font/google";
+import { AppProviders } from "./providers";
 import "./globals.css";
 
 const notoSansMono = Noto_Sans_Mono({
@@ -23,12 +24,12 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("pi-theme");if(t==="dark")document.documentElement.classList.add("dark")}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem("pi-theme");if(t==="dark")document.documentElement.classList.add("dark");var l=localStorage.getItem("pi-web.locale");if(l!=="en"&&l!=="zh-CN"){var n=(navigator.languages&&navigator.languages[0])||navigator.language||"en";l=/^zh/i.test(n)?"zh-CN":"en";}document.documentElement.lang=l;}catch(e){}})();`,
           }}
         />
       </head>
       <body style={{ height: "100dvh", display: "flex", flexDirection: "column" }}>
-        {children}
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

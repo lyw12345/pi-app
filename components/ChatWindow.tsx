@@ -1,14 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
+import type { AgentMessage, SessionInfo, SessionTreeNode, TextContent, ToolResultMessage } from "@/lib/types";
 import { MessageView } from "./MessageView";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { useAgentSession, type AgentPhase } from "@/hooks/useAgentSession";
 import { useAudio } from "@/hooks/useAudio";
 import { useDragDrop } from "@/hooks/useDragDrop";
-import { buildMarkdownExport, getActionsForScene, type Scene, type SceneAction } from "@/lib/scenes";
+import { invalidateControlResource } from "@/hooks/useControlCollection";
+import { buildMarkdownExport, getActionsForScene, summarizeOutputStyle, type Scene, type SceneAction } from "@/lib/scenes";
+import { actionPromptAsText, buildActionPrompt } from "@/lib/scene-action-policy";
+import { summarizeForHistory } from "@/lib/history-summary";
+import { suggestNextStep } from "@/lib/next-step-suggestion";
 
 interface Props {
   session: SessionInfo | null;
@@ -97,6 +101,8 @@ function SceneHeader({
   actions,
   latestAssistantText,
   status,
+  suggestedActionId,
+  lastResultSummary,
   onStarter,
   onAction,
 }: {
@@ -104,6 +110,8 @@ function SceneHeader({
   actions: SceneAction[];
   latestAssistantText: string;
   status: string | null;
+  suggestedActionId: string | null;
+  lastResultSummary: string;
   onStarter: (prompt: string) => void;
   onAction: (action: SceneAction) => void;
 }) {
@@ -113,23 +121,34 @@ function SceneHeader({
         <div className="min-w-[220px] flex-1">
           <div className="flex items-center gap-2">
             <span className="rounded-[6px] border border-border bg-bg-subtle px-2 py-0.5 text-[11px] font-medium text-text-muted">{scene.category}</span>
-            <span className="text-[11px] text-text-dim">{scene.outputStyle}</span>
+            <span className="text-[11px] text-text-dim">{summarizeOutputStyle(scene.outputStyle)}</span>
           </div>
           <div className="mt-1 text-[16px] font-semibold leading-snug text-text">{scene.name}</div>
           <div className="mt-1 max-w-[760px] text-[12px] leading-5 text-text-muted">{scene.description}</div>
+          {lastResultSummary && (
+            <div className="mt-2 max-w-[760px] truncate text-[12px] leading-5 text-text-dim" title={lastResultSummary}>
+              Latest: {lastResultSummary}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           {actions.map((action) => {
             const disabled = (action.type === "copy" || action.type === "export") && !latestAssistantText;
+            const isSuggested = action.id === suggestedActionId;
+            const baseClass = "h-8 rounded-[7px] border px-3 text-[12px] font-medium text-text-muted hover:bg-bg-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40";
+            const stateClass = isSuggested
+              ? "border-[color-mix(in_srgb,var(--accent)_70%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_15%,var(--bg-elevated))] text-text"
+              : "border-border bg-bg-elevated";
             return (
               <button
                 key={action.id}
                 onClick={() => onAction(action)}
                 disabled={disabled}
                 title={action.description}
-                className="h-8 rounded-[7px] border border-border bg-bg-elevated px-3 text-[12px] font-medium text-text-muted hover:bg-bg-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+                className={`${baseClass} ${stateClass}`}
               >
                 {status && (action.type === "copy" || action.type === "export") ? status : action.label}
+                {isSuggested && <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent">Suggested</span>}
               </button>
             );
           })}
@@ -174,12 +193,36 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
 
-  // Wrap agent event handler to play sound on agent_end
+  // Wrap agent event handler to play sound on agent_end and to push the latest
+  // assistant output into product-session metadata so the history view can
+  // show a real summary. The PATCH is fire-and-forget; failures only warn.
   const origHandler = handleAgentEventRef.current;
   useEffect(() => {
     handleAgentEventRef.current = (event) => {
-      if (event.type === "agent_end" && soundEnabledRef.current) {
-        playDoneSoundRef.current();
+      if (event.type === "agent_end") {
+        if (soundEnabledRef.current) {
+          playDoneSoundRef.current();
+        }
+        const id = sessionIdRef.current;
+        const activeScene = sceneRef.current;
+        if (id && activeScene) {
+          const summary = lastResultSummaryRef.current;
+          void fetch(`/api/product-sessions/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ lastResultSummary: summary, status: "completed" }),
+          })
+            .then((res) => {
+              if (!res.ok) {
+                console.warn(`[ChatWindow] metadata update failed: ${res.status}`);
+                return;
+              }
+              invalidateControlResource("workbench:history:recent");
+            })
+            .catch((err) => {
+              console.warn("[ChatWindow] metadata update error:", err);
+            });
+        }
       }
       origHandler?.(event);
     };
@@ -233,7 +276,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       const msg = messages[i];
       if (msg.role !== "assistant") continue;
       return msg.content
-        .filter((block): block is import("@/lib/types").TextContent => block.type === "text")
+        .filter((block): block is TextContent => block.type === "text")
         .map((block) => block.text)
         .join("\n")
         .trim();
@@ -241,6 +284,22 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
     return "";
   }, [messages]);
   const [sceneActionStatus, setSceneActionStatus] = useState<string | null>(null);
+
+  const lastActionIdRef = useRef<string | null>(null);
+  const lastResultSummary = useMemo(
+    () => summarizeForHistory(latestAssistantText, 120),
+    [latestAssistantText],
+  );
+  const lastResultSummaryRef = useRef(lastResultSummary);
+  lastResultSummaryRef.current = lastResultSummary;
+  const sessionIdRef = useRef(session?.id);
+  sessionIdRef.current = session?.id;
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
+  const suggestedActionId = useMemo(
+    () => (scene ? suggestNextStep(latestAssistantText, scene, lastActionIdRef.current)?.id ?? null : null),
+    [latestAssistantText, scene],
+  );
 
   const copyLatestResult = useCallback(async () => {
     if (!latestAssistantText) return;
@@ -278,8 +337,15 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       exportLatestResult();
       return;
     }
-    chatInputRef?.current?.insertIfEmpty(`Use the latest result and ${action.description.toLowerCase()}`);
-  }, [chatInputRef, copyLatestResult, exportLatestResult]);
+    const prompt = buildActionPrompt(action, {
+      latestText: latestAssistantText || null,
+      outputStyle: scene?.outputStyle ?? null,
+    });
+    const value = actionPromptAsText(prompt);
+    if (!value) return;
+    lastActionIdRef.current = action.id;
+    chatInputRef?.current?.insertIfEmpty(value);
+  }, [chatInputRef, copyLatestResult, exportLatestResult, latestAssistantText, scene?.outputStyle]);
 
   const chatInputElement = (
     <ChatInput
@@ -371,6 +437,8 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
           actions={sceneActions}
           latestAssistantText={latestAssistantText}
           status={sceneActionStatus}
+          suggestedActionId={suggestedActionId}
+          lastResultSummary={lastResultSummary}
           onStarter={(prompt) => chatInputRef?.current?.insertIfEmpty(prompt)}
           onAction={runSceneAction}
         />
@@ -424,10 +492,10 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
           <div className="mx-auto max-w-[820px] px-4">
 
             {(() => {
-              const toolResultsMap = new Map<string, import("@/lib/types").ToolResultMessage>();
+              const toolResultsMap = new Map<string, ToolResultMessage>();
               for (const msg of messages) {
                 if (msg.role === "toolResult") {
-                  toolResultsMap.set((msg as import("@/lib/types").ToolResultMessage).toolCallId, msg as import("@/lib/types").ToolResultMessage);
+                  toolResultsMap.set((msg as ToolResultMessage).toolCallId, msg as ToolResultMessage);
                 }
               }
               let lastUserIdx = -1;
@@ -468,7 +536,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
                     prevAssistantEntryId={agentRunning ? undefined : prevAssistantEntryId}
                     onEditContent={(content) => chatInputRef?.current?.insertIfEmpty(content)}
                     showTimestamp={showTimestamp}
-                    prevTimestamp={idx > 0 ? (messages[idx - 1] as import("@/lib/types").AgentMessage & { timestamp?: number }).timestamp : undefined}
+                    prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
                   />
                 );
                 if (!isVisible) return view;

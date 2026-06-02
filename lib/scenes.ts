@@ -1,4 +1,6 @@
 import type { SessionInfo } from "./types";
+import { sanitizePromptInput } from "@/lib/prompt-guard";
+import type { SceneOverrides, SceneOverridesMap } from "./scene-overrides";
 
 export type SceneEntryMode = "chat";
 export type SceneStatus = "active" | "draft";
@@ -112,6 +114,14 @@ const ACTIONS: SceneAction[] = [
     requiresInput: false,
     enabled: true,
   },
+  {
+    id: "summarize",
+    label: "Summarize",
+    type: "prompt",
+    description: "Compress the latest output into 3-5 bullet points.",
+    requiresInput: false,
+    enabled: true,
+  },
 ];
 
 const SOURCES: SceneSource[] = [
@@ -162,7 +172,7 @@ const SCENES: Scene[] = [
     entryMode: "chat",
     defaultPrompt: "Answer enterprise knowledge questions using the available workspace and user-provided materials. State assumptions, cite visible file or document references when possible, and keep answers operational.",
     sourceIds: ["workspace-files", "business-documents"],
-    actionIds: ["copy-result", "export-result", "next-step-plan"],
+    actionIds: ["copy-result", "export-result", "next-step-plan", "summarize"],
     outputStyle: "Direct answer first, then evidence, caveats, and recommended next action.",
     suggestedStarters: [
       { id: "policy-answer", label: "Answer a policy question", prompt: "Answer this internal policy question with source-aware caveats: " },
@@ -179,7 +189,7 @@ const SCENES: Scene[] = [
     entryMode: "chat",
     defaultPrompt: "Create executive-ready reports from the user's request and available materials. Prefer concise structure, clear headings, decision points, and reusable wording.",
     sourceIds: ["workspace-files", "business-documents"],
-    actionIds: ["copy-result", "export-result", "refine-output"],
+    actionIds: ["copy-result", "export-result", "refine-output", "summarize"],
     outputStyle: "Structured report with title, summary, sections, risks, and next steps.",
     suggestedStarters: [
       { id: "weekly-summary", label: "Weekly business summary", prompt: "Create a weekly business summary from these notes and metrics: " },
@@ -196,7 +206,7 @@ const SCENES: Scene[] = [
     entryMode: "chat",
     defaultPrompt: "Draft customer-facing communication from the provided context. Keep tone clear, professional, and specific. Highlight risks or missing context before final wording.",
     sourceIds: ["customer-context", "business-documents"],
-    actionIds: ["copy-result", "export-result", "draft-reply"],
+    actionIds: ["copy-result", "export-result", "draft-reply", "summarize"],
     outputStyle: "Draft reply, rationale, tone notes, and follow-up checklist.",
     suggestedStarters: [
       { id: "reply-thread", label: "Reply to a thread", prompt: "Draft a customer reply for this conversation: " },
@@ -213,7 +223,7 @@ const SCENES: Scene[] = [
     entryMode: "chat",
     defaultPrompt: "Help execute structured business processes. Convert goals into steps, identify owners or missing inputs, and produce reviewable outcomes before recommending next actions.",
     sourceIds: ["process-context", "workspace-files"],
-    actionIds: ["copy-result", "export-result", "next-step-plan"],
+    actionIds: ["copy-result", "export-result", "next-step-plan", "summarize"],
     outputStyle: "Checklist, status table, blockers, and next action.",
     suggestedStarters: [
       { id: "run-checklist", label: "Run a checklist", prompt: "Turn this process into a step-by-step execution checklist: " },
@@ -225,12 +235,52 @@ const SCENES: Scene[] = [
 ];
 
 export function getScenes(): Scene[] {
-  return SCENES.map((scene) => ({ ...scene, suggestedStarters: [...scene.suggestedStarters] }));
+  return SCENES.map((scene) => mergeSceneWithOverride(scene, null));
+}
+
+export function getScenesWithOverrides(overrides: SceneOverridesMap | null): Scene[] {
+  return SCENES.map((scene) => mergeSceneWithOverride(scene, overrides?.[scene.id] ?? null));
 }
 
 export function getSceneById(id: string): Scene | null {
   const scene = SCENES.find((item) => item.id === id);
-  return scene ? { ...scene, suggestedStarters: [...scene.suggestedStarters] } : null;
+  if (!scene) return null;
+  return mergeSceneWithOverride(scene, null);
+}
+
+export function getSceneByIdWithOverride(id: string, override: SceneOverrides | null): Scene | null {
+  const scene = SCENES.find((item) => item.id === id);
+  if (!scene) return null;
+  return mergeSceneWithOverride(scene, override);
+}
+
+export function mergeSceneWithOverride(scene: Scene, override: SceneOverrides | null): Scene {
+  const base: Scene = { ...scene, suggestedStarters: [...scene.suggestedStarters] };
+  if (!override) return base;
+  return {
+    ...base,
+    defaultPrompt: mergeField(base.defaultPrompt, override.defaultPrompt),
+    outputStyle: mergeField(base.outputStyle, override.outputStyle),
+    suggestedStarters: mergeStarters(base.suggestedStarters, override.suggestedStarters),
+  };
+}
+
+function mergeField(baseValue: string, overrideValue: string | null | undefined): string {
+  if (overrideValue === undefined || overrideValue === null) return baseValue;
+  return overrideValue;
+}
+
+function mergeStarters(
+  baseStarters: Scene["suggestedStarters"],
+  overrideStarters: string[] | null | undefined,
+): Scene["suggestedStarters"] {
+  if (overrideStarters === undefined || overrideStarters === null) return baseStarters;
+  return overrideStarters.map((prompt, idx) => {
+    const existing = baseStarters[idx];
+    return existing
+      ? { ...existing, prompt }
+      : { id: `custom-${idx + 1}`, label: prompt.slice(0, 48), prompt };
+  });
 }
 
 export function getActionById(id: string): SceneAction | null {
@@ -266,6 +316,10 @@ export function buildSceneLaunchMessage(scene: Scene, userMessage: string): stri
     .filter((action) => action.enabled)
     .map((action) => `- ${action.label}: ${action.description}`)
     .join("\n");
+  // User request is the untrusted part. Sanitize aggressively before it lands
+  // in the model prompt to defend against oversized inputs and control chars
+  // sneaking in via pastes or future form-based scene entry.
+  const safeUserMessage = sanitizePromptInput(userMessage, { onTruncate: "marker" });
 
   return [
     `Scene: ${scene.name}`,
@@ -286,7 +340,7 @@ export function buildSceneLaunchMessage(scene: Scene, userMessage: string): stri
     actions || "- Continue the conversation",
     "",
     "User request:",
-    userMessage.trim(),
+    safeUserMessage,
   ].join("\n");
 }
 
@@ -344,7 +398,17 @@ export function buildMarkdownExport({
 }
 
 export function titleFromMessage(message: string, fallback: string): string {
-  const normalized = message.replace(/\s+/g, " ").trim();
-  if (!normalized) return fallback;
-  return normalized.length > 72 ? `${normalized.slice(0, 69)}...` : normalized;
+  const cleaned = sanitizePromptInput(message, { maxChars: 80, onTruncate: "ellipsis" });
+  if (!cleaned) return fallback;
+  return cleaned;
+}
+
+export function summarizeOutputStyle(outputStyle: string, maxLength = 60): string {
+  const cleaned = sanitizePromptInput(outputStyle, { maxChars: 240, onTruncate: "none" });
+  if (!cleaned) return "";
+  // Prefer the first sentence as the human-readable summary.
+  const firstSentence = cleaned.split(/[.;\n]/)[0]?.trim() ?? "";
+  if (!firstSentence) return "";
+  if (firstSentence.length <= maxLength) return firstSentence;
+  return `${firstSentence.slice(0, maxLength - 1).trimEnd()}…`;
 }

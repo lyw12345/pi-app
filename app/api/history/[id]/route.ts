@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { listAllSessions } from "@/lib/session-reader";
-import { readProductSessionMetadata } from "@/lib/scene-metadata";
+import { readProductSessionMetadataMap } from "@/lib/scene-metadata";
 import { buildHistoryItems } from "@/lib/scenes";
 
 export async function GET(
@@ -10,7 +10,7 @@ export async function GET(
   try {
     const { id } = await params;
     const sessions = await listAllSessions();
-    const item = buildHistoryItems(sessions, readProductSessionMetadata())
+    const item = buildHistoryItems(sessions, readProductSessionMetadataMap())
       .find((historyItem) => historyItem.sessionId === id);
 
     if (!item) {

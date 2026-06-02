@@ -13,14 +13,29 @@ import { WorkbenchHistory } from "./WorkbenchHistory";
 import { WorkbenchHome } from "./WorkbenchHome";
 import { WorkbenchSettings } from "./WorkbenchSettings";
 import { useTheme } from "@/hooks/useTheme";
+import { useCachedResource } from "@/hooks/useControlCollection";
+import { useI18n } from "@/lib/i18n/provider";
 import type { SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { ChatInputHandle } from "./ChatInput";
 import { getSceneById, type ProductHistoryItem, type Scene } from "@/lib/scenes";
+
+interface ScenesResponse {
+  scenes?: Scene[];
+  error?: string;
+}
+
+const fetchScenes = async (): Promise<Scene[]> => {
+  const res = await fetch("/api/scenes");
+  const data = (await res.json()) as ScenesResponse;
+  if (data.error) throw new Error(data.error);
+  return data.scenes ?? [];
+};
 
 export function AppShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isDark, toggleTheme } = useTheme();
+  const { t: i18nT } = useI18n();
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   // When user clicks +, we only store the cwd — no fake session id
   const [newSessionCwd, setNewSessionCwd] = useState<string | null>(null);
@@ -36,6 +51,20 @@ export function AppShell() {
   const [workbenchView, setWorkbenchView] = useState<"home" | "history" | "settings" | "chat">("home");
   const [activeScene, setActiveScene] = useState<Scene | null>(null);
   const [launchingSceneId, setLaunchingSceneId] = useState<string | null>(null);
+
+  // Shared scenes cache (same key as WorkbenchHome / WorkbenchSettings) so
+  // AppShell honors the latest override values from ~/.pi/agent/scene-overrides.json
+  // when looking up a scene by id. The cache is invalidated by WorkbenchSettings
+  // after every PUT/DELETE, so the next lookup here picks up the new merged data.
+  const scenes = useCachedResource<Scene[]>("workbench:scenes", fetchScenes, {
+    staleMs: 15_000,
+    retries: 1,
+  });
+  const scenesRef = useRef<Scene[] | null>(scenes.data);
+  scenesRef.current = scenes.data;
+  const findScene = useCallback((id: string): Scene | null => {
+    return scenesRef.current?.find((s) => s.id === id) ?? getSceneById(id);
+  }, []);
 
   // Branch navigator state — populated by ChatWindow via onBranchDataChange
   const [branchTree, setBranchTree] = useState<SessionTreeNode[]>([]);
@@ -154,6 +183,10 @@ export function AppShell() {
     setActiveScene(null);
     setWorkbenchView("home");
     setSessionKey((k) => k + 1);
+    // Re-fetch the session list so a brand-new cwd (default dir / custom path
+    // / new folder) shows its pre-existing sessions, and so the next
+    // handleSessionCreated reflects the correct cwd-filtered tree.
+    setRefreshKey((k) => k + 1);
     resetChatChrome();
     router.replace("/", { scroll: false });
   }, [resetChatChrome, router]);
@@ -161,7 +194,7 @@ export function AppShell() {
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false) => {
     setNewSessionCwd(null);
     setSelectedSession(session);
-    setActiveScene(session.sceneId ? getSceneById(session.sceneId) : null);
+    setActiveScene(session.sceneId ? findScene(session.sceneId) : null);
     setWorkbenchView("chat");
     setSessionKey((k) => k + 1);
     setSystemPrompt(null);
@@ -284,7 +317,7 @@ export function AppShell() {
   }, [ensureWorkbenchCwd, resetChatChrome, router]);
 
   const handleOpenSceneById = useCallback((sceneId: string) => {
-    const scene = getSceneById(sceneId);
+    const scene = findScene(sceneId);
     if (scene) handleOpenScene(scene);
   }, [handleOpenScene]);
 
@@ -304,7 +337,7 @@ export function AppShell() {
       productStatus: item.status,
       lastResultSummary: item.summary,
     });
-    setActiveScene(item.sceneId ? getSceneById(item.sceneId) : null);
+    setActiveScene(item.sceneId ? findScene(item.sceneId) : null);
     setWorkbenchView("chat");
     setSessionKey((k) => k + 1);
     resetChatChrome();
@@ -313,11 +346,13 @@ export function AppShell() {
 
   useEffect(() => {
     if (!initialSceneId || initialSceneRestoredRef.current || initialSessionId) return;
-    const scene = getSceneById(initialSceneId);
+    const scene = findScene(initialSceneId);
     if (!scene) return;
     initialSceneRestoredRef.current = true;
     handleOpenScene(scene);
-  }, [handleOpenScene, initialSceneId, initialSessionId]);
+    // Re-run when the shared scenes cache loads so override-only scenes can
+    // be restored on initial mount (static fallback misses them).
+  }, [handleOpenScene, initialSceneId, initialSessionId, scenes.data, findScene]);
 
   const handleOpenFile = useCallback((filePath: string, fileName: string) => {
     const tabId = `file:${filePath}`;
@@ -347,10 +382,11 @@ export function AppShell() {
   const showChat = selectedSession !== null || effectiveNewSessionCwd !== null;
   // While restoring initial session from URL, don't show the placeholder
   const showPlaceholder = initialSessionRestored && !showChat;
-  const activeChatScene = activeScene ?? (selectedSession?.sceneId ? getSceneById(selectedSession.sceneId) : null);
+  const activeChatScene = activeScene ?? (selectedSession?.sceneId ? findScene(selectedSession.sceneId) : null);
   const settingsSkillsDisabled = !activeCwd && !selectedSession?.cwd && !newSessionCwd;
 
   const activeFileTab = fileTabs.find((t) => t.id === activeFileTabId) ?? null;
+  const topBarBackground = "var(--bg-elevated)";
 
   const sidebarContent = (
     <>
@@ -358,6 +394,8 @@ export function AppShell() {
         selectedSessionId={selectedSession?.id ?? null}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
+        onOpenSettings={handleOpenSettingsView}
+        isSettingsView={workbenchView === "settings"}
         initialSessionId={initialSessionId}
         onInitialRestoreDone={handleInitialRestoreDone}
         refreshKey={refreshKey}
@@ -368,55 +406,6 @@ export function AppShell() {
         explorerRefreshKey={explorerRefreshKey}
         onAtMention={handleAtMention}
       />
-      <div style={{ padding: "8px", flexShrink: 0, display: "flex", justifyContent: "space-between", gap: 4 }}>
-        {([
-          {
-            label: "Models",
-            onClick: () => setModelsConfigOpen(true),
-            disabled: false,
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" />
-                <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
-                <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
-                <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
-                <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
-              </svg>
-            ),
-          },
-          {
-            label: "Skills",
-            onClick: () => setSkillsConfigOpen(true),
-            disabled: !activeCwd && !selectedSession?.cwd && !newSessionCwd,
-            icon: (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-              </svg>
-            ),
-          },
-        ] as { label: string; onClick: () => void; disabled: boolean; icon: React.ReactNode }[]).map(({ label, onClick, disabled, icon }) => (
-          <button
-            key={label}
-            onClick={onClick}
-            disabled={disabled}
-            title={label}
-            style={{
-              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              height: 32, padding: 0, background: "none", border: "none",
-              borderRadius: 9, color: "var(--text-muted)", cursor: disabled ? "default" : "pointer",
-              fontSize: 12, opacity: disabled ? 0.35 : 1,
-              transition: "background 0.12s, color 0.12s",
-            }}
-            onMouseEnter={(e) => { if (!disabled) { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; } }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text-muted)"; }}
-          >
-            {icon}
-            {label}
-          </button>
-        ))}
-      </div>
     </>
   );
 
@@ -458,10 +447,10 @@ export function AppShell() {
       {/* Center: chat */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
         {/* Top bar with sidebar toggle */}
-        <div ref={topBarRef} style={{ display: "flex", alignItems: "center", flexShrink: 0, borderBottom: "1px solid var(--border)", height: 38, background: "var(--bg-panel)", backdropFilter: "var(--chrome-blur)", WebkitBackdropFilter: "var(--chrome-blur)" }}>
+        <div ref={topBarRef} style={{ display: "flex", alignItems: "center", flexShrink: 0, borderBottom: "1px solid var(--border-strong)", height: 38, background: topBarBackground }}>
           <button
             onClick={() => setSidebarOpen((v) => !v)}
-            title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            title={sidebarOpen ? i18nT("appShell.hideSidebar") : i18nT("appShell.showSidebar")}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 38, height: 38, padding: 0,
@@ -486,8 +475,8 @@ export function AppShell() {
               const rect = e.currentTarget.getBoundingClientRect();
               toggleTheme({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
             }}
-            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            title={isDark ? i18nT("appShell.switchToLightMode") : i18nT("appShell.switchToDarkMode")}
+            aria-label={isDark ? i18nT("appShell.switchToLightMode") : i18nT("appShell.switchToDarkMode")}
             aria-pressed={isDark}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -514,9 +503,8 @@ export function AppShell() {
           </button>
           <div style={{ display: "flex", alignItems: "center", height: "100%", borderRight: "1px solid var(--border)" }}>
             {([
-              { id: "home", label: "Home", onClick: handleOpenHome },
-              { id: "history", label: "History", onClick: handleOpenHistoryView },
-              { id: "settings", label: "Settings", onClick: handleOpenSettingsView },
+              { id: "home", label: i18nT("appShell.home"), onClick: handleOpenHome },
+              { id: "history", label: i18nT("appShell.history"), onClick: handleOpenHistoryView },
             ] as const).map((item) => (
               <button
                 key={item.id}
@@ -526,7 +514,7 @@ export function AppShell() {
                   padding: "0 12px",
                   border: "none",
                   borderTop: workbenchView === item.id ? "2px solid var(--accent)" : "2px solid transparent",
-                  background: workbenchView === item.id ? "var(--bg-selected)" : "none",
+                  background: workbenchView === item.id ? "var(--bg-popover)" : topBarBackground,
                   color: workbenchView === item.id ? "var(--text)" : "var(--text-muted)",
                   cursor: "pointer",
                   fontSize: 12,
@@ -554,8 +542,8 @@ export function AppShell() {
                 onClick={() => toggleTopPanel("system")}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  height: "100%", padding: "0 12px",
-                  background: activeTopPanel === "system" ? "var(--bg-selected)" : "none",
+                  height: "100%", boxSizing: "border-box", padding: "0 12px",
+                  background: activeTopPanel === "system" ? "var(--bg-popover)" : topBarBackground,
                   border: "none",
                   borderTop: activeTopPanel === "system" ? "2px solid var(--accent)" : "2px solid transparent",
                   borderRight: "1px solid var(--border)",
@@ -572,7 +560,10 @@ export function AppShell() {
                   <line x1="8" y1="13" x2="16" y2="13" />
                   <line x1="8" y1="17" x2="13" y2="17" />
                 </svg>
-                <span>System</span>
+                <span>{i18nT("appShell.system")}</span>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--text-dim)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 2, transform: activeTopPanel === "system" ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+                  <polyline points="2 3.5 5 6.5 8 3.5" />
+                </svg>
               </button>
             </div>
           )}
@@ -594,15 +585,18 @@ export function AppShell() {
 
             const tooltipParts: string[] = [];
             if (t) {
-              tooltipParts.push(`in: ${t.input.toLocaleString()}`);
-              tooltipParts.push(`out: ${t.output.toLocaleString()}`);
-              tooltipParts.push(`cache read: ${t.cacheRead.toLocaleString()}`);
-              tooltipParts.push(`cache write: ${t.cacheWrite.toLocaleString()}`);
-              if (c > 0) tooltipParts.push(`cost: $${c.toFixed(4)}`);
+              tooltipParts.push(i18nT("appShell.tooltipIn", { value: t.input.toLocaleString() }));
+              tooltipParts.push(i18nT("appShell.tooltipOut", { value: t.output.toLocaleString() }));
+              tooltipParts.push(i18nT("appShell.tooltipCacheRead", { value: t.cacheRead.toLocaleString() }));
+              tooltipParts.push(i18nT("appShell.tooltipCacheWrite", { value: t.cacheWrite.toLocaleString() }));
+              if (c > 0) tooltipParts.push(i18nT("appShell.tooltipCost", { value: c.toFixed(4) }));
             }
             if (contextUsage?.contextWindow) {
               const pct = contextUsage.percent;
-              tooltipParts.push(`context: ${pct !== null ? pct.toFixed(1) + "%" : "unknown"} of ${contextUsage.contextWindow.toLocaleString()} tokens`);
+              tooltipParts.push(i18nT("appShell.tooltipContext", {
+                used: pct !== null ? `${pct.toFixed(1)}%` : i18nT("common.unknown"),
+                total: contextUsage.contextWindow.toLocaleString(),
+              }));
             }
             const tooltip = tooltipParts.join("  |  ");
 
@@ -671,11 +665,10 @@ export function AppShell() {
             }}>
               {activeTopPanel === "system" && (
                 <div style={{
-                  background: "var(--bg-panel)",
+                  background: "var(--bg-popover)",
+                  borderTop: "1px solid var(--border)",
                   borderBottom: "1px solid var(--border)",
                   boxShadow: "var(--shadow-popover)",
-                  backdropFilter: "var(--chrome-blur)",
-                  WebkitBackdropFilter: "var(--chrome-blur)",
                 }}>
                   {systemPrompt ? (
                     <div style={{
@@ -692,11 +685,11 @@ export function AppShell() {
                     </div>
                   ) : systemPrompt === "" ? (
                     <div style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
-                      System prompt is empty (tools are disabled)
+                      {i18nT("appShell.systemPromptEmpty")}
                     </div>
                   ) : (
                     <div style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
-                      Send a message to load the system prompt
+                      {i18nT("appShell.systemPromptLoadHint")}
                     </div>
                   )}
                 </div>
@@ -738,7 +731,6 @@ export function AppShell() {
               <WorkbenchHome
                 onOpenScene={handleOpenScene}
                 onOpenHistory={handleOpenHistoryItem}
-                onOpenSettings={handleOpenSettingsView}
                 launchingSceneId={launchingSceneId}
               />
             )
@@ -757,7 +749,7 @@ export function AppShell() {
         }}
       >
         {/* Right panel tab bar */}
-        <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 38, backdropFilter: "var(--chrome-blur)", WebkitBackdropFilter: "var(--chrome-blur)" }}>
+        <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: topBarBackground, borderBottom: "1px solid var(--border-strong)", height: 38 }}>
           <div style={{ flex: 1, overflow: "hidden" }}>
             <TabBar
               tabs={fileTabs}
@@ -775,7 +767,7 @@ export function AppShell() {
             <FileViewer filePath={activeFileTab.filePath} cwd={activeCwd ?? undefined} />
           ) : (
             <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 12 }}>
-              No file open
+              {i18nT("appShell.noFileOpen")}
             </div>
           )}
         </div>
@@ -784,12 +776,12 @@ export function AppShell() {
     {/* File panel toggle — always visible at top-right */}
     <button
       onClick={() => setRightPanelOpen((v) => !v)}
-      title={rightPanelOpen ? "Hide file panel" : "Show file panel"}
+      title={rightPanelOpen ? i18nT("appShell.hideFilePanel") : i18nT("appShell.showFilePanel")}
       style={{
         position: "fixed", top: 0, right: 0, zIndex: 300,
         display: "flex", alignItems: "center", justifyContent: "center",
         width: 36, height: 36, padding: 0,
-        background: "var(--bg-panel)", border: "none", borderLeft: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
+        background: topBarBackground, border: "none", borderLeft: "1px solid var(--border-strong)", borderBottom: "1px solid var(--border-strong)",
         color: rightPanelOpen ? "var(--text)" : "var(--text-muted)",
         cursor: "pointer", transition: "color 0.12s",
       }}

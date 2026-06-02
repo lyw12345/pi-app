@@ -10,7 +10,7 @@ import {
 } from "@/lib/session-reader";
 import { getRpcSession } from "@/lib/rpc-manager";
 import { rejectUnsafeMutation } from "@/lib/local-request-guard";
-import { readProductSessionMetadata } from "@/lib/scene-metadata";
+import { readProductSessionMetadataMap } from "@/lib/scene-metadata";
 import { getSceneById } from "@/lib/scenes";
 
 export async function GET(
@@ -38,7 +38,7 @@ export async function GET(
     try { modified = statSync(filePath).mtime.toISOString(); } catch { /* use header timestamp */ }
     const allSessions = await listAllSessions();
     const parentSessionId = allSessions.find((s) => s.id === id)?.parentSessionId;
-    const productMetadata = readProductSessionMetadata()[id];
+    const productMetadata = readProductSessionMetadataMap()[id];
     const scene = productMetadata ? getSceneById(productMetadata.sceneId) : null;
     const info = header ? {
       path: filePath,
