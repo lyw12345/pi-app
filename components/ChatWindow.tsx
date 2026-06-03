@@ -32,6 +32,7 @@ interface Props {
   toolMode?: ToolMode;
   advancedMode?: boolean;
   onOpenAccounts?: () => void;
+  onOpenModels?: () => void;
 }
 
 function phaseLabel(phase: AgentPhase): string {
@@ -174,7 +175,7 @@ function SceneHeader({
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, scene, toolMode = "simple", advancedMode = false, onOpenAccounts }: Props) {
+export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, scene, toolMode = "simple", advancedMode = false, onOpenAccounts, onOpenModels }: Props) {
   const { t } = useI18n();
   const {
     loading, error, messages, entryIds, streamState,
@@ -430,19 +431,32 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       onDrop={handleDrop}
     >
       {modelList.length === 0 && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] px-6">
-          <div className="max-w-md rounded-[10px] border border-border bg-bg-panel p-5 text-center shadow-sm">
-            <div className="text-[15px] font-semibold text-text">{t("accounts.needAccountTitle")}</div>
-            <p className="mt-2 text-[13px] leading-6 text-text-muted">{t("accounts.needAccountDescription")}</p>
-            {onOpenAccounts && (
-              <button
-                type="button"
-                onClick={onOpenAccounts}
-                className="mt-4 rounded-[7px] bg-accent px-4 py-2 text-[12px] font-semibold text-white hover:bg-accent-hover"
-              >
-                {t("accounts.goToAccounts")}
-              </button>
-            )}
+        <div className="shrink-0 border-b border-border bg-bg-panel px-4 py-3">
+          <div className="mx-auto flex max-w-[820px] flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-semibold text-text">{t("accounts.needAccountTitle")}</div>
+              <p className="mt-1 text-[12px] leading-5 text-text-muted">{t("accounts.needAccountDescription")}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {onOpenModels && (
+                <button
+                  type="button"
+                  onClick={onOpenModels}
+                  className="rounded-[7px] border border-border bg-bg-elevated px-3 py-2 text-[12px] font-medium text-text hover:bg-bg-hover"
+                >
+                  {t("accounts.openModelsConfig")}
+                </button>
+              )}
+              {onOpenAccounts && (
+                <button
+                  type="button"
+                  onClick={onOpenAccounts}
+                  className="rounded-[7px] bg-accent px-3 py-2 text-[12px] font-semibold text-white hover:bg-accent-hover"
+                >
+                  {t("accounts.goToAccounts")}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

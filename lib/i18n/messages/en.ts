@@ -492,8 +492,10 @@ export const en = {
     connecting: "Connecting…",
     disconnect: "Disconnect",
     defaultModel: "Default model",
-    defaultModelDescription: "Used when you start a new conversation.",
+    defaultModelDescription: "Used when you start a new conversation. Change the model anytime from the chat input bar.",
+    perSessionModelHint: "Each conversation can use a different model via the selector below the message box.",
     selectDefaultModel: "Select a model",
+    openModelsConfig: "Edit models.json",
     oauthTimeout: "Login timed out",
     oauthFailed: "Login failed",
     needAccountTitle: "Connect an AI service first",
@@ -518,7 +520,7 @@ export const en = {
     advancedMode: "Advanced mode",
     advancedModeDescription: "Show the session sidebar and full tool controls.",
     openAccounts: "AI services",
-    openAccountsDescription: "Connect providers and choose your default model.",
+    openAccountsDescription: "Connect providers and set the default model for new chats.",
   },
   tools: {
     capability: {

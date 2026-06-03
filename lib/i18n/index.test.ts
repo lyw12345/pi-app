@@ -46,6 +46,13 @@ describe("i18n translation lookup", () => {
     expect(translate("zh-CN", "workbenchSettings.settings")).toBe("设置");
   });
 
+  it("exposes model configuration copy in both locales", () => {
+    expect(translate("en", "accounts.openModelsConfig")).toBe("Edit models.json");
+    expect(translate("zh-CN", "accounts.openModelsConfig")).toBe("编辑 models.json");
+    expect(translate("en", "accounts.perSessionModelHint")).toContain("selector");
+    expect(translate("zh-CN", "accounts.perSessionModelHint")).toContain("模型选择器");
+  });
+
   it("interpolates named params", () => {
     expect(translate("zh-CN", "sessionSidebar.newSessionIn", { cwd: "/tmp/demo" })).toBe("在 /tmp/demo 中新建会话");
   });

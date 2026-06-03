@@ -836,6 +836,7 @@ export function AppShell() {
               toolMode={toolMode}
               advancedMode={advancedMode}
               onOpenAccounts={handleOpenAccountsView}
+              onOpenModels={() => setModelsConfigOpen(true)}
             />
           ) : showPlaceholder ? (
             workbenchView === "history" ? (
@@ -843,6 +844,7 @@ export function AppShell() {
             ) : workbenchView === "settings" ? (
               <WorkbenchSettings
                 onOpenAccounts={handleOpenAccountsView}
+                onOpenModels={() => setModelsConfigOpen(true)}
                 onOpenSkills={() => setSkillsConfigOpen(true)}
                 onOpenSceneId={handleOpenSceneById}
                 onEnterAdvancedMode={handleEnterAdvancedMode}
@@ -852,7 +854,10 @@ export function AppShell() {
                 skillsDisabled={settingsSkillsDisabled}
               />
             ) : workbenchView === "accounts" ? (
-              <AccountsSettings onModelsChanged={() => setModelsRefreshKey((k) => k + 1)} />
+              <AccountsSettings
+                onModelsChanged={() => setModelsRefreshKey((k) => k + 1)}
+                onOpenModels={() => setModelsConfigOpen(true)}
+              />
             ) : (
               <WorkbenchHome
                 onOpenScene={handleOpenScene}

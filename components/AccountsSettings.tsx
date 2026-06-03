@@ -17,9 +17,10 @@ interface ModelOption {
 
 interface Props {
   onModelsChanged?: () => void;
+  onOpenModels?: () => void;
 }
 
-export function AccountsSettings({ onModelsChanged }: Props) {
+export function AccountsSettings({ onModelsChanged, onOpenModels }: Props) {
   const { t } = useI18n();
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
   const [modelList, setModelList] = useState<ModelOption[]>([]);
@@ -135,9 +136,6 @@ export function AccountsSettings({ onModelsChanged }: Props) {
   }, [onModelsChanged]);
 
   const connectedProviders = providers.filter((provider) => provider.loggedIn);
-  const connectedModelList = modelList.filter((model) =>
-    connectedProviders.some((provider) => provider.id === model.provider),
-  );
 
   return (
     <div className="h-full overflow-y-auto">
@@ -199,23 +197,38 @@ export function AccountsSettings({ onModelsChanged }: Props) {
               </div>
             </section>
 
-            <section>
+            <section className="mb-6">
               <h2 className="m-0 text-[15px] font-semibold text-text">{t("accounts.defaultModel")}</h2>
               <p className="mt-2 text-[12px] leading-5 text-text-muted">{t("accounts.defaultModelDescription")}</p>
               <select
-                disabled={connectedModelList.length === 0 || savingDefault}
+                disabled={modelList.length === 0 || savingDefault}
                 value={defaultModel ? `${defaultModel.provider}::${defaultModel.modelId}` : ""}
                 onChange={(event) => void handleDefaultModelChange(event.target.value)}
                 className="mt-3 w-full rounded-[8px] border border-border bg-bg-panel px-3 py-2 text-[13px] text-text"
               >
                 <option value="">{t("accounts.selectDefaultModel")}</option>
-                {connectedModelList.map((model) => (
+                {modelList.map((model) => (
                   <option key={`${model.provider}:${model.id}`} value={`${model.provider}::${model.id}`}>
                     {model.name} ({model.provider})
                   </option>
                 ))}
               </select>
+              <p className="mt-2 text-[12px] leading-5 text-text-dim">{t("accounts.perSessionModelHint")}</p>
             </section>
+
+            {onOpenModels && (
+              <section>
+                <h2 className="m-0 text-[15px] font-semibold text-text">{t("workbenchSettings.models")}</h2>
+                <p className="mt-2 text-[12px] leading-5 text-text-muted">{t("workbenchSettings.modelsDescription")}</p>
+                <button
+                  type="button"
+                  onClick={onOpenModels}
+                  className="mt-3 rounded-[7px] border border-border bg-bg-elevated px-4 py-2 text-[12px] font-medium text-text hover:bg-bg-hover"
+                >
+                  {t("accounts.openModelsConfig")}
+                </button>
+              </section>
+            )}
           </>
         )}
       </div>

@@ -492,8 +492,10 @@ export const zhCN = {
     connecting: "连接中…",
     disconnect: "断开",
     defaultModel: "默认模型",
-    defaultModelDescription: "新建对话时使用。",
+    defaultModelDescription: "新建对话时使用。可在输入框下方随时切换模型。",
+    perSessionModelHint: "每条对话都可在输入框下方的模型选择器中单独指定模型。",
     selectDefaultModel: "选择模型",
+    openModelsConfig: "编辑 models.json",
     oauthTimeout: "登录超时",
     oauthFailed: "登录失败",
     needAccountTitle: "请先连接 AI 服务",
@@ -518,7 +520,7 @@ export const zhCN = {
     advancedMode: "高级模式",
     advancedModeDescription: "显示会话侧栏与完整工具控制。",
     openAccounts: "AI 服务",
-    openAccountsDescription: "连接服务提供方并选择默认模型。",
+    openAccountsDescription: "连接服务提供方，并设置新对话的默认模型。",
   },
   tools: {
     capability: {

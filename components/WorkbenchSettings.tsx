@@ -11,6 +11,7 @@ import { RemoteAccessSettings } from "./RemoteAccessSettings";
 
 interface Props {
   onOpenAccounts: () => void;
+  onOpenModels: () => void;
   onOpenSkills: () => void;
   onOpenSceneId: (sceneId: string) => void;
   onEnterAdvancedMode?: () => void;
@@ -76,6 +77,7 @@ function translateSettingsError(message: string | null, t: ReturnType<typeof use
 
 export function WorkbenchSettings({
   onOpenAccounts,
+  onOpenModels,
   onOpenSkills,
   onOpenSceneId,
   onEnterAdvancedMode,
@@ -213,7 +215,7 @@ export function WorkbenchSettings({
           <div className="text-[11px] font-semibold uppercase tracking-[0] text-text-dim">{t("workbenchSettings.platform")}</div>
           <h1 className="m-0 mt-1 text-[22px] font-semibold tracking-[0] text-text">{t("workbenchSettings.settings")}</h1>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <div className="rounded-[8px] border border-border bg-bg-panel p-4 text-left">
             <div className="text-[14px] font-semibold text-text">{t("workbenchSettings.language")}</div>
             <div className="mt-2 text-[12px] leading-5 text-text-muted">{t("workbenchSettings.languageDescription")}</div>
@@ -238,6 +240,13 @@ export function WorkbenchSettings({
           >
             <div className="text-[14px] font-semibold text-text">{t("settings.openAccounts")}</div>
             <div className="mt-2 text-[12px] leading-5 text-text-muted">{t("settings.openAccountsDescription")}</div>
+          </button>
+          <button
+            onClick={onOpenModels}
+            className="rounded-[8px] border border-border bg-bg-panel p-4 text-left hover:bg-bg-hover"
+          >
+            <div className="text-[14px] font-semibold text-text">{t("workbenchSettings.models")}</div>
+            <div className="mt-2 text-[12px] leading-5 text-text-muted">{t("workbenchSettings.modelsDescription")}</div>
           </button>
           <button
             onClick={onOpenSkills}
