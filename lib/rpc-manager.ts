@@ -1,4 +1,5 @@
-import { createAgentSession, DEFAULT_COMPACTION_SETTINGS, findCutPoint, getAgentDir, SessionManager } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, DEFAULT_COMPACTION_SETTINGS, findCutPoint, SessionManager } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@/lib/agent-dir";
 import { cacheSessionPath } from "./session-reader";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 

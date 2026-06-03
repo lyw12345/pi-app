@@ -9,6 +9,7 @@ import {
   getFirstForkNode,
   getLinearLeafId,
   hasFork,
+  findNodeById,
 } from "@/lib/branch-tree";
 import type { SessionTreeNode } from "@/lib/types";
 
@@ -286,6 +287,17 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   const mainLeafId = activeLeafId ?? getLinearLeafId(tree);
   const hasContent = showMainBranch || forkNode !== null;
 
+  const branchTabLabel = useMemo(() => {
+    if (!activeLeafId) return t("branchNavigator.branches");
+    const node = findNodeById(tree, activeLeafId);
+    if (node?.label) return node.label;
+    if (node) {
+      const entryLabel = getBranchEntryLabel(node.entry, t("branchNavigator.assistantFallback"));
+      if (entryLabel !== node.entry.type) return entryLabel;
+    }
+    return t("branchNavigator.branches");
+  }, [tree, activeLeafId, t]);
+
   const noBranchReason = !hasSession
     ? t("branchNavigator.noActiveSession")
     : tree.length === 0
@@ -335,7 +347,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
           onMouseLeave={(event) => { event.currentTarget.style.color = open ? "var(--text)" : "var(--text-muted)"; }}
         >
           {branchIcon}
-          <span>{t("branchNavigator.branches")}</span>
+          <span>{branchTabLabel}</span>
           {chevron}
         </button>
         {open && dropdownPos && (

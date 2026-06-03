@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@/lib/agent-dir";
 import type { RemoteAuthConfig } from "./remote-auth-types";
 import { REMOTE_CONFIG_FILENAME } from "./remote-auth-types";
 

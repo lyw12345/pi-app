@@ -64,7 +64,6 @@ export async function runRelayHost(options: {
     } satisfies HttpTunnelResponse);
   };
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const line = await relayPoll(options.relayEndpoint, options.serverId, "server");
     if (!line) continue;
@@ -114,7 +113,6 @@ export async function runRelayClientProxy(options: {
       }
     }
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const line = await relayPoll(options.relayEndpoint, options.serverId, "client");
       if (!line || !sharedKey) continue;

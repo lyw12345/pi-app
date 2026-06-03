@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Scene } from "@/lib/scenes";
 import { useCachedResource, invalidateControlResource } from "@/hooks/useControlCollection";
 import { useI18n } from "@/lib/i18n/provider";

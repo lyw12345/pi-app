@@ -26,7 +26,6 @@ type FetchOptions = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
   var __piControlCache: Map<string, Entry<unknown>> | undefined;
 }
 

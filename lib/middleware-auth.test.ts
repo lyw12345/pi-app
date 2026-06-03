@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const agentDir = vi.hoisted(() => ({ value: "" }));
 
-vi.mock("@earendil-works/pi-coding-agent", () => ({
+vi.mock("@/lib/agent-dir", () => ({
   getAgentDir: () => agentDir.value,
 }));
 

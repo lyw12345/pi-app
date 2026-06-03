@@ -1,13 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { randomUUID } from "crypto";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@/lib/agent-dir";
 import type { ProductSessionMetadata, ProductSessionMetadataMap } from "./scenes";
 
 const FILENAME = "product-sessions.json";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __piProductSessionWriteQueue: Promise<unknown> | undefined;
 }
 

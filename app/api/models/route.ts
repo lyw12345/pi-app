@@ -1,4 +1,5 @@
-import { AuthStorage, ModelRegistry, SettingsManager, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { AuthStorage, ModelRegistry, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@/lib/agent-dir";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { requireApiAuth } from "@/lib/api-auth";
 

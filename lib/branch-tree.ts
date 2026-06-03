@@ -48,6 +48,15 @@ export function buildActivePath(nodes: SessionTreeNode[], targetId: string | nul
   return new Set(search(nodes, []) ?? []);
 }
 
+export function findNodeById(nodes: SessionTreeNode[], targetId: string): SessionTreeNode | null {
+  for (const node of nodes) {
+    if (node.entry.id === targetId) return node;
+    const found = findNodeById(node.children, targetId);
+    if (found) return found;
+  }
+  return null;
+}
+
 export function getBranchEntryLabel(
   entry: SessionEntry,
   fallback: string,

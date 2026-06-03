@@ -774,7 +774,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
     setLoginState({ phase: "idle" });
     onRefresh();
-  }, [provider.id, onRefresh, t]);
+  }, [provider.id, onRefresh]);
 
   const submitCode = useCallback(async (token: string, code: string) => {
     if (!code.trim()) return;
@@ -1009,7 +1009,7 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
     } finally {
       setRemoving(false);
     }
-  }, [provider.id, onRefresh, t]);
+  }, [provider.id, onRefresh]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

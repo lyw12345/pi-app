@@ -230,7 +230,7 @@ function AddSkillPanel({
     } finally {
       setSearching(false);
     }
-  }, []);
+  }, [t]);
 
   const install = useCallback(
     async (pkg: string) => {

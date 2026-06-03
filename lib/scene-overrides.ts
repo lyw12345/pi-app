@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { randomUUID } from "crypto";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@/lib/agent-dir";
 
 const FILENAME = "scene-overrides.json";
 const SCHEMA_VERSION = 1 as const;
@@ -20,7 +20,6 @@ interface SceneOverridesFile {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __piSceneOverridesWriteQueue: Promise<unknown> | undefined;
 }
 

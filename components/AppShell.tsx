@@ -219,7 +219,7 @@ export function AppShell() {
     if (!isRestore) {
       router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
     }
-  }, [router]);
+  }, [router, findScene]);
 
   const handleNewSession = useCallback((_sessionId: string, cwd: string) => {
     setSelectedSession(null);
@@ -328,7 +328,7 @@ export function AppShell() {
   const handleOpenSceneById = useCallback((sceneId: string) => {
     const scene = findScene(sceneId);
     if (scene) handleOpenScene(scene);
-  }, [handleOpenScene]);
+  }, [handleOpenScene, findScene]);
 
   const handleOpenHistoryItem = useCallback((item: ProductHistoryItem) => {
     setNewSessionCwd(null);
@@ -351,7 +351,7 @@ export function AppShell() {
     setSessionKey((k) => k + 1);
     resetChatChrome();
     router.replace(`?session=${encodeURIComponent(item.sessionId)}`, { scroll: false });
-  }, [resetChatChrome, router]);
+  }, [resetChatChrome, router, findScene]);
 
   useEffect(() => {
     if (!initialSceneId || initialSceneRestoredRef.current || initialSessionId) return;
@@ -409,7 +409,8 @@ export function AppShell() {
         onInitialRestoreDone={handleInitialRestoreDone}
         refreshKey={refreshKey}
         onSessionDeleted={handleSessionDeleted}
-        selectedCwd={selectedSession?.cwd ?? newSessionCwd ?? null}
+        pinnedSession={selectedSession}
+        selectedCwd={selectedSession?.cwd ?? newSessionCwd ?? activeCwd ?? null}
         onCwdChange={handleCwdChange}
         onOpenFile={handleOpenFile}
         explorerRefreshKey={explorerRefreshKey}

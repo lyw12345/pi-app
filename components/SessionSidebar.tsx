@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useI18n } from "@/lib/i18n/provider";
 import { fetchWithTimeout, isConnectionError } from "@/lib/api-fetch";
 import type { SessionInfo } from "@/lib/types";
@@ -16,6 +16,8 @@ interface Props {
   onInitialRestoreDone?: () => void;
   refreshKey?: number;
   onSessionDeleted?: (sessionId: string) => void;
+  /** Active session from AppShell — shown immediately before /api/sessions catches up */
+  pinnedSession?: SessionInfo | null;
   selectedCwd?: string | null;
   onCwdChange?: (cwd: string | null) => void;
   onOpenFile?: (filePath: string, fileName: string) => void;
@@ -203,8 +205,8 @@ function PiAgentTitle() {
   );
 }
 
-export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, onOpenSettings, isSettingsView = false, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention }: Props) {
-  const { t, locale } = useI18n();
+export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, onOpenSettings, isSettingsView = false, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, pinnedSession, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention }: Props) {
+  const { t } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -221,11 +223,14 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [explorerRefreshDone, setExplorerRefreshDone] = useState(false);
   const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const explorerRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadSessionsGenerationRef = useRef(0);
 
   const loadSessions = useCallback(async (showLoading = false) => {
+    const generation = ++loadSessionsGenerationRef.current;
     try {
       if (showLoading) setLoading(true);
       const res = await fetchWithTimeout("/api/sessions", { cache: "no-store" });
+      if (generation !== loadSessionsGenerationRef.current) return;
       if (res.status === 401) throw new Error("auth");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { sessions: SessionInfo[] };
@@ -237,6 +242,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         sessionRefreshTimerRef.current = setTimeout(() => setSessionRefreshDone(false), 2000);
       }
     } catch (e) {
+      if (generation !== loadSessionsGenerationRef.current) return;
       if (isConnectionError(e)) {
         setError(t("sessionSidebar.serverUnavailable"));
       } else if (e instanceof Error && e.message === "auth") {
@@ -245,7 +251,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         setError(String(e));
       }
     } finally {
-      setLoading(false);
+      if (generation === loadSessionsGenerationRef.current) {
+        setLoading(false);
+      }
     }
   }, [t]);
 
@@ -277,6 +285,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     if (allSessions.length === 0) return;
 
     if (selectedCwd === null) {
+      if (selectedCwdProp) {
+        setSelectedCwd(selectedCwdProp);
+        return;
+      }
       // If restoring a session, set cwd to match that session
       if (initialSessionId && !restoredRef.current) {
         restoredRef.current = true;
@@ -292,7 +304,9 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       const cwds = getRecentCwds(allSessions);
       if (cwds.length > 0) setSelectedCwd(cwds[0]);
     }
-  }, [allSessions, selectedCwd, initialSessionId, onSelectSession, onInitialRestoreDone]);
+  }, [allSessions, selectedCwd, selectedCwdProp, initialSessionId, onSelectSession, onInitialRestoreDone]);
+
+  const filterCwd = selectedCwdProp ?? selectedCwd;
 
   const commitCustomPath = useCallback(() => {
     const path = customPathValue.trim();
@@ -331,22 +345,29 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   }, []);
 
   const handleNewSession = useCallback(() => {
-    if (!selectedCwd) return;
+    if (!filterCwd) return;
     // Generate a temporary UUID client-side — no backend call needed.
     // Pi will be spawned lazily when the user sends the first message.
     const tempId = typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
-    onNewSession?.(tempId, selectedCwd);
-  }, [selectedCwd, onNewSession]);
+    onNewSession?.(tempId, filterCwd);
+  }, [filterCwd, onNewSession]);
 
   const recentCwds = getRecentCwds(allSessions);
-  const filteredSessions = selectedCwd
-    ? allSessions.filter((s) => s.cwd === selectedCwd)
+  const filteredSessions = filterCwd
+    ? allSessions.filter((s) => s.cwd === filterCwd)
     : allSessions;
 
+  const sessionsForTree = useMemo(() => {
+    if (!pinnedSession) return filteredSessions;
+    if (filterCwd && pinnedSession.cwd !== filterCwd) return filteredSessions;
+    if (filteredSessions.some((s) => s.id === pinnedSession.id)) return filteredSessions;
+    return [pinnedSession, ...filteredSessions];
+  }, [filteredSessions, pinnedSession, filterCwd]);
+
   // Build parent-child tree within the filtered set
-  const sessionTree = buildSessionTree(filteredSessions);
+  const sessionTree = buildSessionTree(sessionsForTree);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
@@ -363,13 +384,13 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
           <div style={{ display: "flex", gap: 6 }}>
             <button
               onClick={handleNewSession}
-              disabled={!selectedCwd}
+              disabled={!filterCwd}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                 background: "var(--bg-hover)",
                 border: "1px solid var(--border)",
-                color: selectedCwd ? "var(--text-muted)" : "var(--text-dim)",
-                cursor: selectedCwd ? "pointer" : "not-allowed",
+                color: filterCwd ? "var(--text-muted)" : "var(--text-dim)",
+                cursor: filterCwd ? "pointer" : "not-allowed",
                 height: 32,
                 paddingLeft: 10,
                 paddingRight: 12,
@@ -450,8 +471,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
               display: "flex",
               alignItems: "center",
               padding: "6px 10px",
-              background: selectedCwd ? "var(--bg-hover)" : "rgba(37,99,235,0.06)",
-              border: selectedCwd ? "1px solid var(--border)" : "1px solid rgba(37,99,235,0.4)",
+              background: filterCwd ? "var(--bg-hover)" : "rgba(37,99,235,0.06)",
+              border: filterCwd ? "1px solid var(--border)" : "1px solid rgba(37,99,235,0.4)",
               borderRadius: 7,
               cursor: "pointer",
               fontSize: 12,
@@ -468,11 +489,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 whiteSpace: "nowrap",
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
-                color: selectedCwd ? "var(--text)" : "var(--text-dim)",
+                color: filterCwd ? "var(--text)" : "var(--text-dim)",
               }}
-              title={selectedCwd ?? ""}
+              title={filterCwd ?? ""}
             >
-              {selectedCwd ? shortenCwd(selectedCwd, homeDir) : (initialSessionId && !restoredRef.current ? "" : t("sessionSidebar.selectProject"))}
+              {filterCwd ? shortenCwd(filterCwd, homeDir) : (initialSessionId && !restoredRef.current ? "" : t("sessionSidebar.selectProject"))}
             </span>
           </button>
 
@@ -506,10 +527,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                     gap: 7,
                     width: "100%",
                     padding: "8px 10px",
-                    background: cwd === selectedCwd ? "var(--bg-selected)" : "none",
+                    background: cwd === filterCwd ? "var(--bg-selected)" : "none",
                     border: "none",
                     borderBottom: "1px solid var(--border)",
-                    color: cwd === selectedCwd ? "var(--text)" : "var(--text-muted)",
+                    color: cwd === filterCwd ? "var(--text)" : "var(--text-muted)",
                     cursor: "pointer",
                     textAlign: "left",
                     fontSize: 11,

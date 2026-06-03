@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import webpush from "web-push";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@/lib/agent-dir";
 import type { PushConfig, PushPublicStatus, PushSubscriptionRecord } from "./push-types";
 import { PUSH_CONFIG_FILENAME } from "./push-types";
 

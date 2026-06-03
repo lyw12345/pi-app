@@ -274,7 +274,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
     : null;
 
   const sceneActions = useMemo(() => scene ? getActionsForScene(scene) : [], [scene]);
-  const latestAssistantText = useMemo(() => {
+  const latestAssistantText = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.role !== "assistant") continue;
@@ -285,7 +285,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
         .trim();
     }
     return "";
-  }, [messages]);
+  })();
   const [sceneActionStatus, setSceneActionStatus] = useState<string | null>(null);
 
   const lastActionIdRef = useRef<string | null>(null);

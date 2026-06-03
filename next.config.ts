@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
-  allowedDevOrigins: ['192.168.*.*'],
+  allowedDevOrigins: ["192.168.*.*"],
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
     NEXT_PUBLIC_PI_VERSION: piVersion,

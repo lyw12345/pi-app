@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "../lib/agent-dir.js";
 import { runRelayHost } from "../lib/pi-relay/tunnel";
 import { DEFAULT_RELAY_ENDPOINT } from "../lib/pi-relay/types";
 

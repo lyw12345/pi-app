@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@/lib/agent-dir";
 import { rejectUnsafeMutation } from "@/lib/local-request-guard";
 import { requireApiAuth } from "@/lib/api-auth";
 

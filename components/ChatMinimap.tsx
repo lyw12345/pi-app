@@ -153,17 +153,17 @@ export function ChatMinimap({ messages, streamingMessage, scrollContainer, messa
     return () => clearTimeout(t);
   }, [messages.length, updatePositions]);
 
-  const scrollToMinimapRatio = useCallback((viewportTopRatio: number) => {
-    const el = scrollContainer.current;
-    if (!el) return;
-    const scrollable = el.scrollHeight - el.clientHeight;
-    if (scrollable <= 0) return;
-    const clamped = Math.max(0, Math.min(1 - viewportRatio, viewportTopRatio));
-    el.scrollTop = (clamped / (1 - viewportRatio)) * scrollable;
-  }, [scrollContainer, viewportRatio]);
-
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!visible) return;
+
+    const el = scrollContainer.current;
+    if (!el) return;
+    const scrollToPos = (viewportTopRatio: number) => {
+      const scrollable = el.scrollHeight - el.clientHeight;
+      if (scrollable <= 0) return;
+      const clamped = Math.max(0, Math.min(1 - viewportRatio, viewportTopRatio));
+      el.scrollTop = (clamped / (1 - viewportRatio)) * scrollable;
+    };
 
     draggingRef.current = true;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -172,12 +172,12 @@ export function ChatMinimap({ messages, streamingMessage, scrollContainer, messa
     const insideBox = grabOffset >= 0 && grabOffset <= viewportRatio;
     const offset = insideBox ? grabOffset : viewportRatio / 2;
 
-    scrollToMinimapRatio(clickRatio - offset);
+    scrollToPos(clickRatio - offset);
 
     const onMove = (ev: MouseEvent) => {
       if (!draggingRef.current) return;
       const r = (ev.clientY - rect.top) / rect.height;
-      scrollToMinimapRatio(r - offset);
+      scrollToPos(r - offset);
     };
     const onUp = () => {
       draggingRef.current = false;
@@ -186,7 +186,7 @@ export function ChatMinimap({ messages, streamingMessage, scrollContainer, messa
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [visible, viewportRatio, scrollRatio, scrollToMinimapRatio]);
+  }, [visible, viewportRatio, scrollRatio, scrollContainer]);
 
 
 
