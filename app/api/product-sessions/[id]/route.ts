@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { listAllSessions } from "@/lib/session-reader";
 import { readProductSessionMetadata, upsertProductSessionMetadata } from "@/lib/scene-metadata";
 import { sanitizePromptInput } from "@/lib/prompt-guard";
 import { rejectUnsafeMutation } from "@/lib/local-request-guard";
@@ -78,13 +79,22 @@ export async function PATCH(
 
   try {
     const existing = readProductSessionMetadata(id);
-    if (!existing) {
+    const session = existing ? null : (await listAllSessions()).find((item) => item.id === id);
+    if (!existing && !session) {
       return NextResponse.json({ error: "Session metadata not found" }, { status: 404 });
     }
+    const now = new Date().toISOString();
+    const base: ProductSessionMetadata = existing ?? {
+      title: session?.name || session?.firstMessage || "(untitled)",
+      status: "active",
+      lastResultSummary: "",
+      startedAt: session?.created ?? now,
+      updatedAt: session?.modified ?? now,
+    };
     const merged: ProductSessionMetadata = {
-      ...existing,
+      ...base,
       ...updates,
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     };
     await upsertProductSessionMetadata(id, merged);
     return NextResponse.json({ ok: true, metadata: merged });

@@ -297,6 +297,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         const target = allSessions.find((s) => s.id === initialSessionId);
         if (target && target.cwd === selectedCwdProp) {
           onSelectSession(target, true);
+          finishRestore(true);
           return;
         }
         finishRestore(false);
@@ -307,6 +308,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       if (target) {
         setSelectedCwd(target.cwd);
         onSelectSession(target, true);
+        finishRestore(true);
         return;
       }
 
@@ -319,6 +321,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     const target = allSessions.find((s) => s.id === initialSessionId);
     if (target) {
       onSelectSession(target, true);
+      finishRestore(true);
       return;
     }
     finishRestore(false);
