@@ -768,13 +768,13 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       es.close();
       setLoginState((prev) => prev.phase === "success" ? prev : { phase: "error", message: t("modelsConfig.connectionLost") });
     };
-  }, [provider.id, onRefresh]);
+  }, [provider.id, onRefresh, t]);
 
   const handleLogout = useCallback(async () => {
     await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
     setLoginState({ phase: "idle" });
     onRefresh();
-  }, [provider.id, onRefresh]);
+  }, [provider.id, onRefresh, t]);
 
   const submitCode = useCallback(async (token: string, code: string) => {
     if (!code.trim()) return;
@@ -795,7 +795,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } catch (e) {
       setLoginState({ phase: "error", message: e instanceof Error ? e.message : t("modelsConfig.networkError") });
     }
-  }, [provider.id]);
+  }, [provider.id, t]);
 
   const submitSelection = useCallback(async (token: string, value: string) => {
     setLoginState({ phase: "progress", message: t("modelsConfig.continuing") });
@@ -812,7 +812,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
     } catch (e) {
       setLoginState({ phase: "error", message: e instanceof Error ? e.message : t("modelsConfig.networkError") });
     }
-  }, [provider.id]);
+  }, [provider.id, t]);
 
   const isWorking = loginState.phase === "connecting" || loginState.phase === "progress" ||
     loginState.phase === "auth" || loginState.phase === "device_code" ||
@@ -1009,7 +1009,7 @@ function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRef
     } finally {
       setRemoving(false);
     }
-  }, [provider.id, onRefresh]);
+  }, [provider.id, onRefresh, t]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
