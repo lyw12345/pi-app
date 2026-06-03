@@ -50,4 +50,43 @@ describe("AgentSessionWrapper", () => {
     wrapper.destroy();
     vi.useRealTimers();
   });
+
+  it("sends get_session_stats through inner session", async () => {
+    const { AgentSessionWrapper } = await import("./rpc-manager");
+    const stats = {
+      sessionId: "s1",
+      sessionFile: "/tmp/session.jsonl",
+      userMessages: 1,
+      assistantMessages: 1,
+      toolCalls: 0,
+      toolResults: 0,
+      totalMessages: 2,
+      tokens: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, total: 15 },
+      cost: 0.001,
+    };
+    const inner = {
+      sessionId: "s1",
+      sessionFile: "/tmp/session.jsonl",
+      subscribe: vi.fn(() => vi.fn()),
+      getSessionStats: vi.fn(() => stats),
+    };
+    const wrapper = new AgentSessionWrapper(inner as never);
+    await expect(wrapper.send({ type: "get_session_stats" })).resolves.toEqual(stats);
+  });
+
+  it("exports html via inner exportToHtml", async () => {
+    const { AgentSessionWrapper } = await import("./rpc-manager");
+    const exportToHtml = vi.fn(async () => "/tmp/session.html");
+    const inner = {
+      sessionId: "s1",
+      sessionFile: "/tmp/session.jsonl",
+      subscribe: vi.fn(() => vi.fn()),
+      exportToHtml,
+    };
+    const wrapper = new AgentSessionWrapper(inner as never);
+    const result = await wrapper.send({ type: "export_html" }) as { path: string; filename: string };
+    expect(result.path).toBe("/tmp/session.html");
+    expect(result.filename).toBe("session.html");
+    expect(exportToHtml).toHaveBeenCalledOnce();
+  });
 });

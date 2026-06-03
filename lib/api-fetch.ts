@@ -15,8 +15,10 @@ export async function fetchWithTimeout(
 
 export async function probeServer(timeoutMs = 5000): Promise<boolean> {
   try {
-    const res = await fetchWithTimeout("/api/home", { timeoutMs, cache: "no-store" });
-    return res.ok;
+    const res = await fetchWithTimeout("/api/health", { timeoutMs, cache: "no-store" });
+    if (!res.ok) return false;
+    const body = await res.json().catch(() => null) as { ok?: boolean } | null;
+    return body?.ok === true;
   } catch {
     return false;
   }

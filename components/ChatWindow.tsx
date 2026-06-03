@@ -14,6 +14,7 @@ import { actionPromptAsText, buildActionPrompt } from "@/lib/scene-action-policy
 import { summarizeForHistory } from "@/lib/history-summary";
 import { suggestNextStep } from "@/lib/next-step-suggestion";
 import { useI18n } from "@/lib/i18n/provider";
+import type { ToolMode } from "@/lib/pi-web-preferences";
 
 interface Props {
   session: SessionInfo | null;
@@ -28,6 +29,9 @@ interface Props {
   onSessionStatsChange?: (stats: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   scene?: Scene | null;
+  toolMode?: ToolMode;
+  advancedMode?: boolean;
+  onOpenAccounts?: () => void;
 }
 
 function phaseLabel(phase: AgentPhase): string {
@@ -170,7 +174,7 @@ function SceneHeader({
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, scene }: Props) {
+export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, scene, toolMode = "simple", advancedMode = false, onOpenAccounts }: Props) {
   const { t } = useI18n();
   const {
     loading, error, messages, entryIds, streamState,
@@ -331,6 +335,24 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
     setTimeout(() => setSceneActionStatus(null), 1500);
   }, [latestAssistantText, scene, session?.name, session?.productTitle]);
 
+  const exportConversationHtml = useCallback(async () => {
+    const sid = session?.id ?? sessionIdRef.current;
+    if (!sid) return;
+    const res = await fetch(`/api/agent/${encodeURIComponent(sid)}/export.html`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `pi-session-${sid.slice(0, 8)}.html`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    setSceneActionStatus(t("settings.exportConversationAction"));
+    window.setTimeout(() => setSceneActionStatus(null), 1500);
+  }, [session?.id, t]);
+
   const runSceneAction = useCallback((action: SceneAction) => {
     if (action.type === "copy") {
       copyLatestResult();
@@ -368,6 +390,8 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       compactError={compactError}
       toolPreset={toolPreset}
       onToolPresetChange={session || isNew ? handleToolPresetChange : undefined}
+      toolMode={toolMode}
+      showAdvancedTools={advancedMode || toolMode !== "simple"}
       thinkingLevel={thinkingLevel}
       onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
       availableThinkingLevels={availableThinkingLevels}
@@ -405,6 +429,23 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {modelList.length === 0 && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] px-6">
+          <div className="max-w-md rounded-[10px] border border-border bg-bg-panel p-5 text-center shadow-sm">
+            <div className="text-[15px] font-semibold text-text">{t("accounts.needAccountTitle")}</div>
+            <p className="mt-2 text-[13px] leading-6 text-text-muted">{t("accounts.needAccountDescription")}</p>
+            {onOpenAccounts && (
+              <button
+                type="button"
+                onClick={onOpenAccounts}
+                className="mt-4 rounded-[7px] bg-accent px-4 py-2 text-[12px] font-semibold text-white hover:bg-accent-hover"
+              >
+                {t("accounts.goToAccounts")}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {isDragOver && (
         <div className="pointer-events-none absolute inset-0 z-50 flex animate-[drop-zone-in_0.15s_ease_both] items-center justify-center bg-[rgba(37,99,235,0.06)] backdrop-blur-[1px]">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -448,6 +489,18 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
           onStarter={(prompt) => chatInputRef?.current?.insertIfEmpty(prompt)}
           onAction={runSceneAction}
         />
+      )}
+
+      {session && (
+        <div className="flex items-center justify-end border-b border-border px-4 py-2">
+          <button
+            type="button"
+            onClick={() => void exportConversationHtml().catch(() => setSceneActionStatus(t("common.failed")))}
+            className="rounded-[6px] border border-border px-3 py-1.5 text-[12px] font-medium text-text-muted hover:bg-bg-hover hover:text-text"
+          >
+            {t("settings.exportConversationAction")}
+          </button>
+        </div>
       )}
 
       {isEmptyNew ? (

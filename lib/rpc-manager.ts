@@ -1,5 +1,8 @@
 import { createAgentSession, DEFAULT_COMPACTION_SETTINGS, findCutPoint, SessionManager } from "@earendil-works/pi-coding-agent";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { getAgentDir } from "@/lib/agent-dir";
+import { defaultAutoCompactionEnabled, defaultAutoRetryEnabled } from "@/lib/pi-web-preferences";
 import { cacheSessionPath } from "./session-reader";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 
@@ -45,8 +48,8 @@ export class AgentSessionWrapper {
       this.resetIdleTimer();
       for (const l of this.listeners) l(event);
       if (event.type === "agent_end") {
-        void import("./push-notifications").then(({ notifyAgentFinished }) =>
-          notifyAgentFinished({ sessionId: this.sessionId }).catch(() => {}),
+        void import("./notify-agent-end").then(({ notifyAgentEnd }) =>
+          notifyAgentEnd({ sessionId: this.sessionId }).catch(() => {}),
         );
       }
     });
@@ -227,6 +230,18 @@ export class AgentSessionWrapper {
         return null;
       }
 
+      case "get_session_stats": {
+        return this.inner.getSessionStats();
+      }
+
+      case "export_html": {
+        const outputPath = typeof command.outputPath === "string"
+          ? command.outputPath
+          : join(tmpdir(), `pi-session-${this.inner.sessionId}.html`);
+        const path = await this.inner.exportToHtml(outputPath);
+        return { path, filename: path.split("/").pop() ?? "session.html" };
+      }
+
       default:
         throw new Error(`Unsupported command: ${type}`);
     }
@@ -324,6 +339,9 @@ export async function startRpcSession(
     if (toolNames?.length === 0) {
       inner.agent.state.systemPrompt = "";
     }
+
+    inner.setAutoCompactionEnabled(defaultAutoCompactionEnabled());
+    inner.setAutoRetryEnabled(defaultAutoRetryEnabled());
 
     const wrapper = new AgentSessionWrapper(inner);
     wrapper.start();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCachedResource, invalidateControlResource } from "@/hooks/useControlCollection";
 import { useI18n } from "@/lib/i18n/provider";
 import type { AutomationEntry } from "@/lib/automation";
@@ -10,9 +10,13 @@ import { SceneConfigEditor } from "./SceneConfigEditor";
 import { RemoteAccessSettings } from "./RemoteAccessSettings";
 
 interface Props {
-  onOpenModels: () => void;
+  onOpenAccounts: () => void;
   onOpenSkills: () => void;
   onOpenSceneId: (sceneId: string) => void;
+  onEnterAdvancedMode?: () => void;
+  advancedMode?: boolean;
+  selectedSessionId?: string | null;
+  sessionStats?: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null;
   skillsDisabled?: boolean;
 }
 
@@ -70,8 +74,22 @@ function translateSettingsError(message: string | null, t: ReturnType<typeof use
   return message;
 }
 
-export function WorkbenchSettings({ onOpenModels, onOpenSkills, onOpenSceneId, skillsDisabled }: Props) {
+export function WorkbenchSettings({
+  onOpenAccounts,
+  onOpenSkills,
+  onOpenSceneId,
+  onEnterAdvancedMode,
+  advancedMode = false,
+  selectedSessionId = null,
+  sessionStats = null,
+  skillsDisabled,
+}: Props) {
   const { locale, setLocale, t } = useI18n();
+  const [autoCompactionEnabled, setAutoCompactionEnabled] = useState(true);
+  const [autoRetryEnabled, setAutoRetryEnabled] = useState(true);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const usage = useCachedResource<UsageSummary>("workbench:usage", fetchUsage, {
     staleMs: 15_000,
     retries: 1,
@@ -90,6 +108,63 @@ export function WorkbenchSettings({ onOpenModels, onOpenSkills, onOpenSceneId, s
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [sceneEditorOpen, setSceneEditorOpen] = useState(false);
+
+  useEffect(() => {
+    void fetch("/api/preferences")
+      .then((res) => res.json())
+      .then((data: { preferences?: { autoCompactionEnabled?: boolean; autoRetryEnabled?: boolean } }) => {
+        setAutoCompactionEnabled(data.preferences?.autoCompactionEnabled !== false);
+        setAutoRetryEnabled(data.preferences?.autoRetryEnabled !== false);
+      })
+      .finally(() => setPrefsLoaded(true));
+  }, []);
+
+  const updatePreference = async (patch: Record<string, boolean>) => {
+    await fetch("/api/preferences", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (selectedSessionId) {
+      if ("autoCompactionEnabled" in patch) {
+        await fetch(`/api/agent/${encodeURIComponent(selectedSessionId)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "set_auto_compaction", enabled: patch.autoCompactionEnabled }),
+        });
+      }
+      if ("autoRetryEnabled" in patch) {
+        await fetch(`/api/agent/${encodeURIComponent(selectedSessionId)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "set_auto_retry", enabled: patch.autoRetryEnabled }),
+        });
+      }
+    }
+  };
+
+  const handleExportConversation = async () => {
+    if (!selectedSessionId) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const res = await fetch(`/api/agent/${encodeURIComponent(selectedSessionId)}/export.html`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `pi-session-${selectedSessionId.slice(0, 8)}.html`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handlePrepareRun = async (entry: AutomationEntry) => {
     setRunningId(entry.id);
@@ -158,11 +233,11 @@ export function WorkbenchSettings({ onOpenModels, onOpenSkills, onOpenSceneId, s
             </div>
           </div>
           <button
-            onClick={onOpenModels}
+            onClick={onOpenAccounts}
             className="rounded-[8px] border border-border bg-bg-panel p-4 text-left hover:bg-bg-hover"
           >
-            <div className="text-[14px] font-semibold text-text">{t("workbenchSettings.models")}</div>
-            <div className="mt-2 text-[12px] leading-5 text-text-muted">{t("workbenchSettings.modelsDescription")}</div>
+            <div className="text-[14px] font-semibold text-text">{t("settings.openAccounts")}</div>
+            <div className="mt-2 text-[12px] leading-5 text-text-muted">{t("settings.openAccountsDescription")}</div>
           </button>
           <button
             onClick={onOpenSkills}
@@ -180,6 +255,107 @@ export function WorkbenchSettings({ onOpenModels, onOpenSkills, onOpenSceneId, s
             <div className="mt-2 text-[12px] leading-5 text-text-muted">{t("workbenchSettings.customizeScenesDescription")}</div>
           </button>
         </div>
+
+        <section className="mt-6">
+          <div className="mb-2">
+            <div className="text-[11px] font-semibold uppercase tracking-[0] text-text-dim">{t("settings.stabilityTitle")}</div>
+          </div>
+          <div className="overflow-hidden rounded-[8px] border border-border bg-bg-panel">
+            <label className="flex items-start gap-3 border-b border-border px-4 py-4">
+              <input
+                type="checkbox"
+                checked={autoCompactionEnabled}
+                disabled={!prefsLoaded}
+                onChange={(event) => {
+                  const enabled = event.target.checked;
+                  setAutoCompactionEnabled(enabled);
+                  void updatePreference({ autoCompactionEnabled: enabled });
+                }}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-[13px] font-medium text-text">{t("settings.autoCompaction")}</span>
+                <span className="mt-1 block text-[12px] leading-5 text-text-muted">{t("settings.autoCompactionDescription")}</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 px-4 py-4">
+              <input
+                type="checkbox"
+                checked={autoRetryEnabled}
+                disabled={!prefsLoaded}
+                onChange={(event) => {
+                  const enabled = event.target.checked;
+                  setAutoRetryEnabled(enabled);
+                  void updatePreference({ autoRetryEnabled: enabled });
+                }}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-[13px] font-medium text-text">{t("settings.autoRetry")}</span>
+                <span className="mt-1 block text-[12px] leading-5 text-text-muted">{t("settings.autoRetryDescription")}</span>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        {(selectedSessionId || sessionStats) && (
+          <section className="mt-6">
+            <div className="mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0] text-text-dim">{t("settings.sessionUsageTitle")}</div>
+              <p className="mt-1 text-[12px] leading-5 text-text-muted">{t("settings.sessionUsageDescription")}</p>
+            </div>
+            <div className="rounded-[8px] border border-border bg-bg-panel p-4">
+              {sessionStats ? (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <div className="text-[11px] text-text-dim">{t("settings.inputTokens")}</div>
+                    <div className="mt-1 text-[18px] font-semibold tabular-nums text-text">{sessionStats.tokens.input.toLocaleString(locale)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-text-dim">{t("settings.outputTokens")}</div>
+                    <div className="mt-1 text-[18px] font-semibold tabular-nums text-text">{sessionStats.tokens.output.toLocaleString(locale)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-text-dim">{t("settings.estimatedCost")}</div>
+                    <div className="mt-1 text-[18px] font-semibold tabular-nums text-text">
+                      {(sessionStats.cost ?? 0) > 0 ? `$${(sessionStats.cost ?? 0).toFixed(4)}` : "—"}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[13px] text-text-muted">{t("workbenchSettings.usageMissing")}</div>
+              )}
+              {selectedSessionId && (
+                <div className="mt-4 border-t border-border pt-4">
+                  <div className="text-[13px] font-medium text-text">{t("settings.exportConversation")}</div>
+                  <p className="mt-1 text-[12px] leading-5 text-text-muted">{t("settings.exportConversationDescription")}</p>
+                  <button
+                    type="button"
+                    disabled={exporting}
+                    onClick={() => void handleExportConversation()}
+                    className="mt-3 h-8 rounded-[7px] bg-accent px-3 text-[12px] font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+                  >
+                    {exporting ? t("settings.exporting") : t("settings.exportConversationAction")}
+                  </button>
+                  {exportError && <div className="mt-2 text-[12px] text-red-500">{exportError}</div>}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {onEnterAdvancedMode && !advancedMode && (
+          <section className="mt-6">
+            <button
+              type="button"
+              onClick={onEnterAdvancedMode}
+              className="rounded-[8px] border border-border bg-bg-panel px-4 py-3 text-left hover:bg-bg-hover"
+            >
+              <div className="text-[14px] font-semibold text-text">{t("settings.advancedMode")}</div>
+              <div className="mt-1 text-[12px] leading-5 text-text-muted">{t("settings.advancedModeDescription")}</div>
+            </button>
+          </section>
+        )}
 
         <section className="mt-6">
           <div className="mb-2 flex items-end justify-between gap-3">

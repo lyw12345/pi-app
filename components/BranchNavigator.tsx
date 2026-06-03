@@ -9,7 +9,6 @@ import {
   getFirstForkNode,
   getLinearLeafId,
   hasFork,
-  findNodeById,
 } from "@/lib/branch-tree";
 import type { SessionTreeNode } from "@/lib/types";
 
@@ -17,6 +16,7 @@ interface Props {
   tree: SessionTreeNode[];
   activeLeafId: string | null;
   onLeafChange: (leafId: string | null) => void;
+  gitBranch?: string | null;
   inline?: boolean;
   containerRef?: React.RefObject<HTMLElement | null>;
   open?: boolean;
@@ -252,7 +252,7 @@ function BranchPanelContent({
   return null;
 }
 
-export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, containerRef, open: openProp, onToggle, hasSession }: Props) {
+export function BranchNavigator({ tree, activeLeafId, onLeafChange, gitBranch, inline, containerRef, open: openProp, onToggle, hasSession }: Props) {
   const { t } = useI18n();
   const [openInternal, setOpenInternal] = useState(false);
   const open = openProp !== undefined ? openProp : openInternal;
@@ -287,16 +287,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   const mainLeafId = activeLeafId ?? getLinearLeafId(tree);
   const hasContent = showMainBranch || forkNode !== null;
 
-  const branchTabLabel = useMemo(() => {
-    if (!activeLeafId) return t("branchNavigator.branches");
-    const node = findNodeById(tree, activeLeafId);
-    if (node?.label) return node.label;
-    if (node) {
-      const entryLabel = getBranchEntryLabel(node.entry, t("branchNavigator.assistantFallback"));
-      if (entryLabel !== node.entry.type) return entryLabel;
-    }
-    return t("branchNavigator.branches");
-  }, [tree, activeLeafId, t]);
+  const branchTabLabel = gitBranch ?? t("branchNavigator.branches");
 
   const noBranchReason = !hasSession
     ? t("branchNavigator.noActiveSession")

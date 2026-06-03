@@ -22,6 +22,25 @@ export interface NavigateTreeResult {
   aborted?: boolean;
 }
 
+export interface SessionStats {
+  sessionFile: string | undefined;
+  sessionId: string;
+  userMessages: number;
+  assistantMessages: number;
+  toolCalls: number;
+  toolResults: number;
+  totalMessages: number;
+  tokens: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    total: number;
+  };
+  cost: number;
+  contextUsage?: ContextUsage;
+}
+
 export interface AgentSessionLike {
   readonly sessionId: string;
   readonly sessionFile: string | undefined;
@@ -51,4 +70,6 @@ export interface AgentSessionLike {
   setActiveToolsByName(names: string[]): void;
   abortCompaction(): void;
   getContextUsage(): ContextUsage | undefined;
+  getSessionStats(): SessionStats;
+  exportToHtml(outputPath?: string): Promise<string>;
 }

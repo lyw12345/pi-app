@@ -10,6 +10,7 @@ interface Props {
   onOpenScene: (scene: Scene) => void;
   onOpenHistory: (item: ProductHistoryItem) => void;
   launchingSceneId?: string | null;
+  onEnterAdvancedMode?: () => void;
 }
 
 interface ScenesResponse {
@@ -38,7 +39,7 @@ const fetchRecentHistory = async (): Promise<ProductHistoryItem[]> => {
   return data.history ?? [];
 };
 
-export function WorkbenchHome({ onOpenScene, onOpenHistory, launchingSceneId }: Props) {
+export function WorkbenchHome({ onOpenScene, onOpenHistory, launchingSceneId, onEnterAdvancedMode }: Props) {
   const { t, locale } = useI18n();
   const scenes = useCachedResource<Scene[]>("workbench:scenes", fetchScenes, {
     staleMs: 15_000,
@@ -139,6 +140,17 @@ export function WorkbenchHome({ onOpenScene, onOpenHistory, launchingSceneId }: 
             )}
           </div>
         </section>
+        {onEnterAdvancedMode && (
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={onEnterAdvancedMode}
+              className="text-[12px] text-text-dim underline hover:text-text-muted"
+            >
+              {t("settings.advancedMode")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
