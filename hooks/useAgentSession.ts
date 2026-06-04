@@ -2,10 +2,13 @@
 
 import { useState, useCallback, useRef, useEffect, useReducer } from "react";
 import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
-import { normalizeToolCalls } from "@/lib/normalize";
+import { branchNavigateErrorKey } from "@/lib/branch-navigate-error";
+import { fetchSessionInfo } from "@/lib/fetch-session-info";
+import { normalizeAgentMessage } from "@/lib/normalize";
 import { sendAgentCommand } from "@/lib/agent-client";
 import { getPresetFromTools, PRESET_DEFAULT, PRESET_FULL, PRESET_NONE, type ToolEntry } from "@/components/ToolPanel";
 import type { ToolMode } from "@/lib/pi-web-preferences";
+import { readCachedPiWebPreferences } from "@/lib/pi-web-preferences-cache";
 import { toolModeToToolNames } from "@/lib/tool-presets";
 
 export interface SessionData {
@@ -65,6 +68,7 @@ export interface UseAgentSessionOptions {
   modelsRefreshKey?: number;
   chatInputRef?: React.RefObject<ChatInputHandle | null>;
   onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;
+  onBranchNavigatingChange?: (navigating: boolean) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
   setNewSessionModel?: (model: { provider: string; modelId: string } | null) => void;
   setToolPreset?: (preset: "none" | "default" | "full") => void;
@@ -88,7 +92,7 @@ export interface AttachedImage {
 export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked,
-    modelsRefreshKey, onBranchDataChange, onSystemPromptChange,
+    modelsRefreshKey, onBranchDataChange, onBranchNavigatingChange, onSystemPromptChange,
     toolMode = "simple",
   } = opts;
 
@@ -113,6 +117,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [contextUsage, setContextUsage] = useState<{ percent: number | null; contextWindow: number; tokens: number | null } | null>(null);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
   const [forkingEntryId, setForkingEntryId] = useState<string | null>(null);
+  const [cloning, setCloning] = useState(false);
+  const [branchNavigating, setBranchNavigating] = useState(false);
   const [currentModelOverride, setCurrentModelOverride] = useState<{ provider: string; modelId: string } | null>(null);
   const [pendingModel, setPendingModel] = useState<{ provider: string; modelId: string } | null>(null);
   const [isCompacting, setIsCompacting] = useState(false);
@@ -131,6 +137,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const previousSessionIdRef = useRef<string | null>(null);
   const pendingCreateSessionIdRef = useRef<string | null>(null);
+  const idleSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setNewSessionModel = opts.setNewSessionModel ?? setNewSessionModelState;
   const setToolPresetState = opts.setToolPreset ?? setToolPreset;
@@ -265,6 +272,40 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunningRef.current = agentRunning;
   }, [agentRunning]);
 
+  const clearAgentRunningLocal = useCallback(() => {
+    setAgentRunning(false);
+    setAgentPhase(null);
+    setRetryInfo(null);
+    dispatch({ type: "end" });
+  }, []);
+
+  /** Wrapper may stay alive after a turn; use inner isStreaming, not registry "running". */
+  const syncAgentRunningFromServer = useCallback(async (sid: string) => {
+    if (!sid || !agentRunningRef.current) return;
+    try {
+      const res = await fetch(`/api/agent/${encodeURIComponent(sid)}`);
+      if (!res.ok) {
+        clearAgentRunningLocal();
+        return;
+      }
+      const body = await res.json() as { running?: boolean; state?: { isStreaming?: boolean } };
+      if (!body.running || body.state?.isStreaming === false) {
+        clearAgentRunningLocal();
+      }
+    } catch {
+      // ignore transient poll errors
+    }
+  }, [clearAgentRunningLocal]);
+
+  const scheduleSyncAfterMessageEnd = useCallback((sid: string | null) => {
+    if (!sid) return;
+    if (idleSyncTimerRef.current) clearTimeout(idleSyncTimerRef.current);
+    idleSyncTimerRef.current = setTimeout(() => {
+      idleSyncTimerRef.current = null;
+      void syncAgentRunningFromServer(sid);
+    }, 400);
+  }, [syncAgentRunningFromServer]);
+
   const handleAgentEvent = useCallback((event: AgentEvent) => {
     switch (event.type) {
       case "agent_start":
@@ -273,6 +314,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         dispatch({ type: "start" });
         break;
       case "agent_end":
+        if (idleSyncTimerRef.current) {
+          clearTimeout(idleSyncTimerRef.current);
+          idleSyncTimerRef.current = null;
+        }
         setAgentRunning(false);
         setAgentPhase(null);
         setRetryInfo(null);
@@ -293,7 +338,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       case "message_update": {
         const msg = event.message as Partial<AgentMessage> | undefined;
         if (msg) {
-          dispatch({ type: "update", message: normalizeToolCalls(msg as AgentMessage) });
+          dispatch({ type: "update", message: normalizeAgentMessage(msg as AgentMessage) });
         }
         setAgentPhase(null);
         break;
@@ -301,10 +346,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       case "message_end": {
         const completed = event.message as AgentMessage | undefined;
         if (completed) {
-          setMessages((prev) => [...prev, normalizeToolCalls(completed)]);
+          setMessages((prev) => [...prev, normalizeAgentMessage(completed)]);
         }
         dispatch({ type: "reset" });
         setAgentPhase({ kind: "waiting_model" });
+        scheduleSyncAfterMessageEnd(sessionIdRef.current);
         break;
       }
       case "tool_execution_start": {
@@ -348,20 +394,36 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         }
         break;
     }
-  }, [loadSession, onAgentEnd]);
+  }, [loadSession, onAgentEnd, scheduleSyncAfterMessageEnd]);
   handleAgentEventRef.current = handleAgentEvent;
+
+  const applyAgentRunningFromServer = useCallback((
+    agentState: { running: boolean; state?: { isStreaming?: boolean } } | null | undefined,
+    sid: string,
+  ) => {
+    const activelyStreaming = Boolean(agentState?.running && agentState.state?.isStreaming);
+    if (activelyStreaming) {
+      setAgentRunning(true);
+      setAgentPhase((prev) => prev ?? { kind: "waiting_model" });
+      connectEvents(sid);
+      void loadTools(sid);
+      return;
+    }
+    clearAgentRunningLocal();
+  }, [connectEvents, loadTools, clearAgentRunningLocal]);
 
   const waitForAgentIdle = useCallback(async (sid: string) => {
     for (let attempt = 0; attempt < 120; attempt++) {
       try {
         const res = await fetch(`/api/agent/${encodeURIComponent(sid)}`);
-        if (!res.ok) return;
-        const body = await res.json() as { state?: { isStreaming?: boolean } };
-        if (!body.state?.isStreaming) {
+        if (!res.ok) {
+          clearAgentRunningLocal();
+          return;
+        }
+        const body = await res.json() as { running?: boolean; state?: { isStreaming?: boolean } };
+        if (!body.running || body.state?.isStreaming === false) {
           await loadSession(sid, false, true);
-          setAgentRunning(false);
-          setAgentPhase(null);
-          dispatch({ type: "end" });
+          clearAgentRunningLocal();
           return;
         }
       } catch {
@@ -369,7 +431,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
-  }, [loadSession]);
+  }, [loadSession, clearAgentRunningLocal]);
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {
     if (!message.trim() && !images?.length) return;
@@ -448,10 +510,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!sid) return;
     try {
       await sendAgentCommand(sid, { type: "abort" });
+      void waitForAgentIdle(sid);
     } catch (e) {
       console.error("Failed to abort:", e);
     }
-  }, []);
+  }, [waitForAgentIdle]);
 
   const handleFork = useCallback(async (entryId: string) => {
     const sid = sessionIdRef.current;
@@ -476,7 +539,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const handleNavigate = useCallback(async (entryId: string) => {
     const sid = sessionIdRef.current;
     if (!sid) return;
-    sendAgentCommand(sid, { type: "navigate_tree", targetId: entryId }).catch(() => {});
+    sendAgentCommand(sid, { type: "navigate_tree", targetId: entryId, summarize: false }).catch(() => {});
     setActiveLeafId(entryId);
     await loadContext(sid, entryId);
   }, [loadContext]);
@@ -485,11 +548,47 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     setActiveLeafId(leafId);
     const sid = sessionIdRef.current;
     if (!sid) return;
-    await loadContext(sid, leafId);
-    if (leafId) {
-      sendAgentCommand(sid, { type: "navigate_tree", targetId: leafId }).catch(() => {});
+    if (!leafId) {
+      await loadContext(sid, null);
+      return;
     }
-  }, [loadContext]);
+    const summarize = readCachedPiWebPreferences().branchSummarizeBeforeSwitch === true;
+    setBranchNavigating(true);
+    try {
+      await sendAgentCommand(sid, { type: "navigate_tree", targetId: leafId, summarize });
+      await loadSession(sid, true);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error("Branch navigation failed:", e);
+      setError(message);
+      setCompactError(branchNavigateErrorKey(message));
+      await loadContext(sid, leafId);
+    } finally {
+      setBranchNavigating(false);
+    }
+  }, [loadContext, loadSession]);
+
+  const handleClone = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    setCloning(true);
+    try {
+      const leafId = activeLeafId ?? data?.leafId ?? null;
+      const result = await sendAgentCommand<{ cancelled?: boolean; newSessionId?: string }>(sid, {
+        type: "clone",
+        ...(leafId ? { leafId } : {}),
+      });
+      const { cancelled, newSessionId } = result ?? {};
+      if (!cancelled && newSessionId) {
+        onSessionForked?.(newSessionId);
+      }
+    } catch (e) {
+      console.error("Clone failed:", e);
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCloning(false);
+    }
+  }, [activeLeafId, data?.leafId, onSessionForked]);
 
   const handleModelChange = useCallback(async (provider: string, modelId: string) => {
     if (isNew) {
@@ -624,19 +723,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (isSessionSwitch) {
       setMessages([]);
       setEntryIds([]);
+      setAgentRunning(false);
+      setAgentPhase(null);
+      setRetryInfo(null);
+      dispatch({ type: "end" });
     }
 
     const showLoading = isSessionSwitch || (previousSessionId === null && !isInFlightCreate);
     void loadSession(session.id, showLoading, true).then((agentState) => {
       if (cancelled) return;
-      if (agentState?.running) {
-        void loadTools(session.id);
-        if (agentState.state?.isStreaming) {
-          setAgentRunning(true);
-          setAgentPhase({ kind: "waiting_model" });
-          connectEvents(session.id);
-        }
-      }
+      applyAgentRunningFromServer(agentState, session.id);
       if (agentState?.state) {
         if (agentState.state.isCompacting !== undefined) setIsCompacting(agentState.state.isCompacting);
         if (agentState.state.contextUsage !== undefined) setContextUsage(agentState.state.contextUsage ?? null);
@@ -647,10 +743,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
     return () => {
       cancelled = true;
+      if (idleSyncTimerRef.current) {
+        clearTimeout(idleSyncTimerRef.current);
+        idleSyncTimerRef.current = null;
+      }
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
     };
-  }, [session?.id, loadSession, loadTools, connectEvents]);
+  }, [session?.id, loadSession, applyAgentRunningFromServer]);
 
   useEffect(() => {
     onSystemPromptChange?.(systemPrompt);
@@ -660,6 +760,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!onBranchDataChange) return;
     onBranchDataChange(data?.tree ?? [], activeLeafId, handleLeafChange);
   }, [data?.tree, activeLeafId, handleLeafChange, onBranchDataChange]);
+
+  useEffect(() => {
+    onBranchNavigatingChange?.(branchNavigating);
+  }, [branchNavigating, onBranchNavigatingChange]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -707,7 +811,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     // State
     data, loading, error, activeLeafId, messages, entryIds, streamState,
     agentRunning, modelNames, modelList, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
-    retryInfo, contextUsage, systemPrompt, forkingEntryId,
+    retryInfo, contextUsage, systemPrompt, forkingEntryId, cloning, branchNavigating,
     isCompacting, compactError, currentModel, displayModel, sessionStats,
     agentPhase,
     remoteAuthError,
@@ -716,7 +820,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     sessionIdRef, eventSourceRef, messagesEndRef, scrollContainerRef,
     lastUserMsgRef, pendingScrollToUserRef, initialScrollDoneRef,
     // Actions
-    handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
+    handleSend, handleAbort, handleFork, handleClone, handleNavigate, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handleAbortCompaction,
     handleToolPresetChange, handleThinkingLevelChange, loadTools, setActiveLeafId, setData, setMessages,
     dispatch, setAgentRunning, setForkingEntryId,

@@ -44,24 +44,25 @@ swift build -c release
 ```bash
 cd /path/to/pi-web
 npm run package:macos
-# 输出：dist/macos/Pi.app
+# 输出：dist/macos/Pi.app（约 1.3–1.6 GB，视依赖而定）
 ```
 
 脚本会：
 
-1. `npm run build`（生产 `.next`）
+1. 在 `dist/macos/.next-release` 做**干净生产构建**（不打包 `.next/dev`、`.next/cache`）
 2. `swift build -c release`（PiWorkbench）
-3. 复制 `bin/`、`.next/`、`public/`、`package.json`、`package-lock.json`、`next.config.ts` 与 `node_modules` 到 `Contents/Resources/pi-web/`
-4. 下载并嵌入 Node（默认 v22.16.0，`NODE_VERSION` 可覆盖）到 `Contents/Resources/node/bin/node`
-5. 本地 ad-hoc `codesign`（非公证）
+3. 在 bundle 内 `npm ci --omit=dev`（不复制开发用 `node_modules`）
+4. 嵌入 Node（默认 v22.16.0）并 `xattr -cr` + 仅签名可执行文件
 
-安装与首次打开：
+安装与首次打开（**用 `ditto`，大体积 `cp -R` 易失败**）：
 
 ```bash
-cp -R dist/macos/Pi.app /Applications/
-xattr -cr /Applications/Pi.app   # 未公证包若被拦截，执行后再双击
+rm -rf /Applications/Pi.app
+ditto /path/to/pi-web/dist/macos/Pi.app /Applications/Pi.app
 open /Applications/Pi.app
 ```
+
+若提示已损坏或无法打开：`xattr -cr /Applications/Pi.app` 后再试。
 
 `SKIP_NODE_EMBED=1 ./scripts/package-macos-app.sh` 可跳过内嵌 Node（仅用本机 PATH 里的 node，不适合 M1「免 Node」验收）。
 

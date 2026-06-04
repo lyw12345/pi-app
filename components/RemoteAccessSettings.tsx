@@ -73,6 +73,7 @@ export function RemoteAccessSettings() {
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [relayOfferUrl, setRelayOfferUrl] = useState<string | null>(null);
+  const [wizardStep, setWizardStep] = useState(0);
   const port = typeof window !== "undefined" ? window.location.port || "30141" : "30141";
   const relayCommands = {
     server: "npm run relay:server",
@@ -170,6 +171,7 @@ export function RemoteAccessSettings() {
     setPairingUrl(null);
     setQrDataUrl(null);
     setPairingModalOpen(false);
+    setWizardStep(0);
     void postAction({ action: "disable" });
   };
 
@@ -247,13 +249,69 @@ export function RemoteAccessSettings() {
         {status && !status.enabled && (
           <div className="p-4">
             <div className="text-[13px] text-text-muted">{t("remoteAccess.disabled")}</div>
-            <button
-              onClick={() => void handleEnable()}
-              disabled={busy !== null}
-              className="mt-3 h-8 rounded-[7px] bg-accent px-3 text-[12px] font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
-            >
-              {busy === "enable" ? t("remoteAccess.enabling") : t("remoteAccess.enable")}
-            </button>
+            {wizardStep === 0 && (
+              <div className="mt-4 space-y-2">
+                <div className="text-[13px] font-medium text-text">{t("remoteAccess.wizardPurposeTitle")}</div>
+                <p className="m-0 text-[12px] leading-5 text-text-muted">{t("remoteAccess.wizardPurposeBody")}</p>
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(1)}
+                  className="mt-3 h-8 rounded-[7px] bg-accent px-3 text-[12px] font-semibold text-white hover:bg-accent-hover"
+                >
+                  {t("remoteAccess.wizardNext")}
+                </button>
+              </div>
+            )}
+            {wizardStep === 1 && (
+              <div className="mt-4 space-y-2">
+                <div className="text-[13px] font-medium text-text">{t("remoteAccess.wizardRiskTitle")}</div>
+                <p className="m-0 text-[12px] leading-5 text-text-muted">{t("remoteAccess.wizardRiskBody")}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(0)}
+                    className="h-8 rounded-[7px] border border-border bg-bg-elevated px-3 text-[12px] font-medium text-text-muted hover:bg-bg-hover"
+                  >
+                    {t("common.back")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(2)}
+                    className="h-8 rounded-[7px] bg-accent px-3 text-[12px] font-semibold text-white hover:bg-accent-hover"
+                  >
+                    {t("remoteAccess.wizardNext")}
+                  </button>
+                </div>
+              </div>
+            )}
+            {wizardStep === 2 && (
+              <div className="mt-4 space-y-3">
+                <label className="flex items-center gap-2 text-[12px] text-text-muted">
+                  <input
+                    type="checkbox"
+                    checked={readOnly}
+                    onChange={(event) => setReadOnly(event.target.checked)}
+                  />
+                  {t("remoteAccess.readOnly")}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(1)}
+                    className="h-8 rounded-[7px] border border-border bg-bg-elevated px-3 text-[12px] font-medium text-text-muted hover:bg-bg-hover"
+                  >
+                    {t("common.back")}
+                  </button>
+                  <button
+                    onClick={() => void handleEnable()}
+                    disabled={busy !== null}
+                    className="h-8 rounded-[7px] bg-accent px-3 text-[12px] font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+                  >
+                    {busy === "enable" ? t("remoteAccess.enabling") : t("remoteAccess.wizardEnable")}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -320,7 +378,7 @@ export function RemoteAccessSettings() {
             <details className="group border-t border-border">
               <summary className="cursor-pointer list-none px-4 py-3 text-[12px] font-medium text-text-muted hover:bg-bg-hover hover:text-text [&::-webkit-details-marker]:hidden">
                 <span className="flex items-center justify-between gap-2">
-                  {t("remoteAccess.advancedTitle")}
+                  {t("remoteAccess.developerSection")}
                   <span className="transition-transform group-open:rotate-90">
                     <ChevronRightIcon />
                   </span>

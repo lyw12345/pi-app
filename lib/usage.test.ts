@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProductHistoryItem } from "./product-history";
-import { buildUsageSummary } from "./usage";
+import { buildUsageSummary, buildUsageTimeline } from "./usage";
 
 const history: ProductHistoryItem[] = [
   {
@@ -48,5 +48,16 @@ describe("usage summary", () => {
       completedRuns: 0,
       generatedAt: "2026-06-01T12:00:00.000Z",
     });
+  });
+});
+
+describe("usage timeline", () => {
+  it("builds seven day buckets with started and completed counts", () => {
+    const timeline = buildUsageTimeline(history, 7, "2026-06-01T12:00:00.000Z");
+    expect(timeline.days).toHaveLength(7);
+    const june1 = timeline.days.find((d) => d.date === "2026-06-01");
+    expect(june1?.started).toBe(2);
+    expect(june1?.completed).toBe(1);
+    expect(june1?.active).toBe(1);
   });
 });

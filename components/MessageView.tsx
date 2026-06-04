@@ -13,6 +13,7 @@ import type {
   UserMessage,
   AssistantMessage,
   ToolResultMessage,
+  TimelineSummaryMessage,
   AssistantContentBlock,
   TextContent,
   ImageContent,
@@ -68,6 +69,9 @@ function copyText(text: string): Promise<void> {
 }
 
 export function MessageView({ message, isStreaming, toolResults, modelNames, entryId, onFork, forking, onNavigate, prevAssistantEntryId, onEditContent, showTimestamp, prevTimestamp }: Props) {
+  if (message.role === "timelineSummary") {
+    return <TimelineSummaryView message={message as TimelineSummaryMessage} />;
+  }
   if (message.role === "user") {
     return <UserMessageView message={message as UserMessage} entryId={entryId} onFork={onFork} forking={forking} onNavigate={onNavigate} prevAssistantEntryId={prevAssistantEntryId} onEditContent={onEditContent} />;
   }
@@ -79,6 +83,47 @@ export function MessageView({ message, isStreaming, toolResults, modelNames, ent
     return null;
   }
   return null;
+}
+
+function TimelineSummaryView({ message }: { message: TimelineSummaryMessage }) {
+  const { t } = useI18n();
+  const [expanded, setExpanded] = useState(false);
+  const label = message.kind === "branch"
+    ? t("messageView.branchSummaryLabel")
+    : t("messageView.compactionSummaryLabel");
+  const preview = message.summary.length > 120 && !expanded
+    ? `${message.summary.slice(0, 120).trim()}…`
+    : message.summary;
+  const canExpand = message.summary.length > 120;
+
+  return (
+    <div style={{ margin: "12px 0", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-panel)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          {label}
+        </span>
+        {canExpand && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--accent)",
+              fontSize: 11,
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            {expanded ? t("messageView.summaryCollapse") : t("messageView.summaryExpand")}
+          </button>
+        )}
+      </div>
+      <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.55, color: "var(--text-muted)", whiteSpace: "pre-wrap" }}>
+        {preview}
+      </div>
+    </div>
+  );
 }
 
 function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAssistantEntryId, onEditContent }: {
@@ -249,7 +294,7 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
                 <button
                   onClick={() => { onFork!(entryId!); }}
                   disabled={forking}
-                  title={forking ? t("messageView.creatingSession") : t("messageView.newSessionTitle")}
+                  title={forking ? t("messageView.creatingSession") : t("messageView.forkFromHereTitle")}
                   style={{
                     display: "flex", alignItems: "center", gap: 4,
                     padding: "3px 8px", height: 22,
@@ -270,7 +315,7 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
                     <circle cx="6" cy="18" r="3" />
                     <path d="M18 9a9 9 0 0 1-9 9" />
                   </svg>
-                  {forking ? t("messageView.creatingSession") : t("messageView.newSession")}
+                  {forking ? t("messageView.creatingSession") : t("messageView.forkFromHere")}
                 </button>
               )}
             </div>

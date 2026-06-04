@@ -82,7 +82,7 @@
 | **M1** | 非技术用户安装后 5 分钟内完成首条有效对话 | 向导 + 账户 + 场景发消息成功率 ≥ 95%（内测） |
 | **M2** | 长任务稳定、结果可带走 | 自动压缩/重试默认开；HTML 导出可用 |
 | **M3** | 体现 pi 差异化（分支/会话资产） | 分支白话化 + 命名 + 统计 + Fork/Clone 区分清晰 |
-| **M4** | 桌面级留存 | 系统通知、可选多 Tab、用量可视化 |
+| **M4** | 平台化（扩展 / 分享 / 场景包） | 扩展浏览、只读分享、场景 JSON 包 |
 
 ---
 
@@ -149,7 +149,7 @@
 | M1 | [m1-checklist.md](./m1-checklist.md) · [m1-design.md](./m1-design.md) · [product-principles.md](./product-principles.md) |
 | M2 | [m2-checklist.md](./m2-checklist.md) · [product-principles.md](./product-principles.md) |
 | M3 | [m3-checklist.md](./m3-checklist.md) · [product-principles.md](./product-principles.md) |
-| M4 | [m4-checklist.md](./m4-checklist.md) · [product-principles.md](./product-principles.md) |
+| M4 | [m4-checklist.md](./m4-checklist.md) · [m4-design.md](./m4-design.md) · [product-principles.md](./product-principles.md) |
 
 ### Milestone 1（M1）— 能独立交付的 macOS App
 
@@ -186,7 +186,7 @@
 
 **周期**：约 4–6 周  
 **目标**：长对话、分支、会话资产可管理。  
-**执行清单**：[m2-checklist.md](./m2-checklist.md)
+**执行清单（v1.1 验收以本清单为准）**：[m2-checklist.md](./m2-checklist.md) — 仅 **M2-01～06**；下表 M2-C～G 为 backlog，不纳入 v1.1 里程碑勾选。
 
 | 工作包 | 任务 | 主要模块 |
 |--------|------|----------|
@@ -211,26 +211,28 @@
 
 **周期**：约 6–8 周  
 **目标**：进阶用户与轻度团队场景。  
-**执行清单**：[m3-checklist.md](./m3-checklist.md)
+**执行清单（v2.0.0 验收以本清单为准）**：[m3-checklist.md](./m3-checklist.md) — **v2.0.0 仅 M3-01～06**（对齐 M2 六件套）；多 Tab / 模板一键 / token 用量 / Dock 为 **v2.0.1 或 backlog**，见清单「对照 M1/M2 评审」。
 
 | 工作包 | 任务 |
 |--------|------|
-| M3-A | PI-11 `/` 命令面板（`get_commands`） |
-| M3-B | PI-12 Skills/模板按钮化、场景保存为模板 |
-| M3-C | PI-14 多会话 Tab + `switch_session` |
-| M3-D | PR-05 自动化：定时/一键跑场景 |
-| M3-E | PR-03 远程「手机查看」向导化 |
-| M3-F | 用量图表、按场景/模型聚合 |
+| M3-01 | PI-11 `/` 命令面板（高级模式，`get_commands`） |
+| M3-02 | PI-12 聊天区插入技能（无模板库） |
+| M3-03 | PR-03 远程白话向导 |
+| M3-04 | PR-04 用量概览（7 日会话活动，简版） |
+| M3-05 | PI-03 导出 HTML（闭合 M1-F 欠账） |
+| M3-06 | 交付：`test:m3`、进阶文档 |
+| v2.0.1+ | 多 Tab、模板+一键运行、token 图表、Dock（见 m3-checklist） |
 
 ---
 
-### Milestone 4（M4）— 平台化（按需）
+### Milestone 4（M4）— 平台化（v2.1.0）
 
-**执行清单**：[m4-checklist.md](./m4-checklist.md)（方向性 backlog，排期待定）
+**执行清单**：[m4-checklist.md](./m4-checklist.md) · **设计**：[m4-design.md](./m4-design.md)（立项 2026-06-04，待评审）
 
-- 扩展只读目录 + 启用说明
-- 只读远程协作 / 分享链接
-- 团队场景同步（需共享配置或后端，单独立项）
+- M4-01 扩展只读目录（高级）
+- M4-02 场景包 JSON 导入 / 导出
+- M4-03 分享对话向导（HTML + 只读 remote 说明）
+- v2.2+：团队场景同步、扩展 enable/disable、多 Tab
 
 ---
 

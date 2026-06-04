@@ -5,6 +5,7 @@ import { getAgentDir } from "@/lib/agent-dir";
 import { defaultAutoCompactionEnabled, defaultAutoRetryEnabled } from "@/lib/pi-web-preferences";
 import { cacheSessionPath } from "./session-reader";
 import { lookupModel } from "./resolve-model";
+import { collectSlashCommands, type SlashCommandListSource } from "./slash-commands";
 import type { AgentSessionLike, ToolInfo } from "./pi-types";
 
 // ============================================================================
@@ -153,8 +154,30 @@ export class AgentSessionWrapper {
       }
 
       case "navigate_tree": {
-        const result = await this.inner.navigateTree(command.targetId as string, {});
+        const summarize = command.summarize === true;
+        const result = await this.inner.navigateTree(command.targetId as string, { summarize });
         return { cancelled: result.cancelled };
+      }
+
+      case "clone": {
+        const sessionManager = this.inner.sessionManager;
+        const currentSessionFile = this.inner.sessionFile;
+
+        if (!sessionManager.isPersisted()) return { cancelled: true };
+        if (!currentSessionFile) throw new Error("Persisted session is missing a session file");
+
+        const sessionDir = sessionManager.getSessionDir();
+        const sourceManager = SessionManager.open(currentSessionFile, sessionDir);
+        const leafId = (command.leafId as string | undefined) ?? sourceManager.getLeafId();
+        if (!leafId) throw new Error("Cannot clone session: no active branch");
+
+        const clonedPath = sourceManager.createBranchedSession(leafId);
+        if (!clonedPath) throw new Error("Failed to clone session");
+
+        const newSessionId = SessionManager.open(clonedPath, sessionDir).getSessionId();
+        cacheSessionPath(newSessionId, clonedPath);
+        this.destroy();
+        return { cancelled: false, newSessionId };
       }
 
       case "set_thinking_level": {
@@ -240,6 +263,12 @@ export class AgentSessionWrapper {
           : join(tmpdir(), `pi-session-${this.inner.sessionId}.html`);
         const path = await this.inner.exportToHtml(outputPath);
         return { path, filename: path.split("/").pop() ?? "session.html" };
+      }
+
+      case "get_commands": {
+        return {
+          commands: collectSlashCommands(this.inner as unknown as SlashCommandListSource),
+        };
       }
 
       default:

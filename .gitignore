@@ -17,12 +17,15 @@
 # next.js
 /.next/
 /.next-dev-*/
+/.next-package/
+/dist/
 /out/
 
 # production
 /build
 
 # misc
+/Users/
 .DS_Store
 *.pem
 .superpowers/

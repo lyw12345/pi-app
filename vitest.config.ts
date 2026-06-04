@@ -10,6 +10,6 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.ts"],
-    exclude: ["node_modules", ".next", ".next-dev-*"],
+    exclude: ["node_modules", ".next", ".next-dev-*", "dist/**", "tmp/**"],
   },
 });

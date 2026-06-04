@@ -127,7 +127,7 @@
 
 ## 交付物
 
-- [ ] macOS `.app` 安装包（内嵌固定版本 pi-web 构建产物）
+- [x] macOS `.app` 安装包（`npm run package:macos` → `dist/macos/Pi.app`；内嵌 Node + pi-web 构建产物；公证待办）
 - [x] 用户说明 1 页：安装、工作区、账户、数据目录位置（`docs/macos-user-guide.md`）
 
 ---

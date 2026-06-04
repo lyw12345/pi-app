@@ -98,7 +98,7 @@ lib/
   rpc-manager.ts      AgentSessionWrapper + registry + startRpcSession
   session-reader.ts   parse .jsonl; getModelNameMap/getModelList/getDefaultModel
   types.ts            shared TypeScript types
-  normalize.ts        normalizeToolCalls() — field name mismatch between file format and our types
+  normalize.ts        normalizeAgentMessage() — toolCall fields + compaction/branch summary roles
 
 components/
   AppShell.tsx        layout + URL state + tab management
@@ -137,7 +137,7 @@ components/
 `parentSession` in the header is **display metadata only** — has zero effect on chat content. Safe to `writeFileSync` the entire file (pi does this itself during migrations). Used when cascade-reparenting children on delete.
 
 ### ToolCall field normalization
-Pi stores toolCall blocks as `{type:"toolCall", id, name, arguments}` but `ToolCallContent` uses `{toolCallId, toolName, input}`. `normalizeToolCalls()` in `lib/normalize.ts` handles this — called in both `session-reader.ts` (file load) and `ChatWindow.handleAgentEvent()` (streaming).
+Pi stores toolCall blocks as `{type:"toolCall", id, name, arguments}` but `ToolCallContent` uses `{toolCallId, toolName, input}`. `normalizeAgentMessage()` in `lib/normalize.ts` handles tool calls and timeline summary roles — used in `session-reader.ts` (file load) and `useAgentSession` SSE updates.
 
 ### New session tool preset
 Tool names are passed at session creation (`POST /api/agent/new` → `toolNames[]`). For existing sessions, the active preset is inferred on mount via `get_tools` → `getPresetFromTools()`. When tools are fully disabled (`toolNames = []`), `rpc-manager.ts` injects a minimal system prompt via `system-prompt-off.ts` + `DefaultResourceLoader`.

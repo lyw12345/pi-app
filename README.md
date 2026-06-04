@@ -36,9 +36,12 @@ PORT=8080 pi-web                 # 也支持环境变量
 
 - **会话浏览器** — 按工作目录分组展示所有 pi 会话
 - **实时对话** — 通过 SSE 流式输出与智能体实时交互
-- **会话分叉** — 从任意用户消息创建独立的新会话分支
+- **会话分叉** — 从用户消息「从这里另开一版」创建独立 `.jsonl` 子会话
+- **复制为新对话** — 将当前分支整段复制为新的独立会话（Clone）
 - **会话内分支** — 回退到任意节点继续对话，在同一文件内创建分支
-- **分支导航器** — 可视化切换同一会话内的各个分支
+- **分支导航器** — 可视化切换分支；可选「切换前先总结」
+- **整理摘要** — 自动/手动整理后在时间线显示可折叠的白话摘要块
+- **会话标题** — 侧栏重命名，顶栏与列表同步显示
 - **模型切换** — 对话中途随时切换模型
 - **工具面板** — 控制智能体可使用的工具
 - **压缩会话** — 对长会话进行摘要，节省上下文窗口
@@ -111,6 +114,19 @@ npm start
 偶尔需要在真实数据上调试 HMR 时，可临时使用 `npm run dev:prod`（30141 + `~/.pi/agent/`），**不要与 `npm run dev` 同时开**。
 
 更多细节见 [AGENTS.md](AGENTS.md#dev--production-isolation)。
+
+### macOS App（M1 本机测试）
+
+```bash
+npm run package:macos   # 产出 dist/macos/Pi.app（干净 .next + 生产依赖 + 内嵌 Node）
+rm -rf /Applications/Pi.app
+ditto dist/macos/Pi.app /Applications/Pi.app
+open /Applications/Pi.app
+```
+
+大体积请用 `ditto` 安装，勿用 `cp -R`（易超时/异常）。若无法打开：`xattr -cr /Applications/Pi.app`。
+
+详见 [macos/README.md](macos/README.md)。
 
 ## 项目结构
 

@@ -20,8 +20,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Health check is loopback-only" }, { status: 403 });
   }
 
+  const piVersion = process.env.NEXT_PUBLIC_PI_VERSION;
   return NextResponse.json({
     ok: true,
     version: readPackageVersion(),
+    ...(piVersion ? { piVersion } : {}),
   });
 }

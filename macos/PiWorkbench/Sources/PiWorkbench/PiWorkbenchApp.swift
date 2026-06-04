@@ -13,6 +13,9 @@ struct PiWorkbenchApp: App {
     }
     .commands {
       CommandGroup(replacing: .appInfo) {
+        Button("关于 Pi") {
+          Task { await server.showAbout() }
+        }
         Button("打开数据文件夹") {
           server.openAgentDirectory()
         }

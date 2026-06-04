@@ -40,8 +40,9 @@ describe("session-reader", () => {
 
     expect(context.entryIds).toEqual(["cmp", "kept", "new"]);
     expect(context.messages[0]).toMatchObject({
-      role: "user",
-      content: expect.stringContaining("older summary"),
+      role: "timelineSummary",
+      kind: "compaction",
+      summary: "older summary",
     });
   });
 });

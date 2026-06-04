@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/provider";
+import type { PiWebPreferences } from "@/lib/pi-web-preferences";
+import { cachePiWebPreferences } from "@/lib/pi-web-preferences-cache";
 import {
   buildActivePath,
   compressBranchNode,
@@ -17,6 +19,7 @@ interface Props {
   activeLeafId: string | null;
   onLeafChange: (leafId: string | null) => void;
   gitBranch?: string | null;
+  branchNavigating?: boolean;
   inline?: boolean;
   containerRef?: React.RefObject<HTMLElement | null>;
   open?: boolean;
@@ -195,6 +198,51 @@ function TreeNodeView({ node, activePathIds, depth, isLast, parentLines, onSelec
   );
 }
 
+function BranchSummarizeToggle({
+  checked,
+  onChange,
+  disabled,
+  t,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  t: ReturnType<typeof useI18n>["t"];
+}) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 8,
+        marginTop: 8,
+        paddingTop: 8,
+        borderTop: "1px solid var(--border)",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+        fontSize: 11,
+        color: "var(--text-muted)",
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        style={{ marginTop: 2 }}
+      />
+      <span>
+        <span style={{ display: "block", color: "var(--text)", fontWeight: 500 }}>
+          {t("branchNavigator.summarizeBeforeSwitch")}
+        </span>
+        <span style={{ display: "block", marginTop: 2, lineHeight: 1.4 }}>
+          {t("branchNavigator.summarizeBeforeSwitchHint")}
+        </span>
+      </span>
+    </label>
+  );
+}
+
 function BranchPanelContent({
   tree,
   activePathIds,
@@ -202,6 +250,9 @@ function BranchPanelContent({
   showMainBranch,
   mainLeafId,
   onSelect,
+  summarizeBeforeSwitch,
+  onSummarizeBeforeSwitchChange,
+  branchNavigating,
   t,
 }: {
   tree: SessionTreeNode[];
@@ -210,10 +261,15 @@ function BranchPanelContent({
   showMainBranch: boolean;
   mainLeafId: string | null;
   onSelect: (id: string) => void;
+  summarizeBeforeSwitch: boolean;
+  onSummarizeBeforeSwitchChange: (next: boolean) => void;
+  branchNavigating?: boolean;
   t: ReturnType<typeof useI18n>["t"];
 }) {
+  let body: ReactNode = null;
+
   if (showMainBranch && mainLeafId) {
-    return (
+    body = (
       <MainBranchRow
         leafId={mainLeafId}
         isActive={activePathIds.has(mainLeafId)}
@@ -221,10 +277,8 @@ function BranchPanelContent({
         onSelect={onSelect}
       />
     );
-  }
-
-  if (forkNode) {
-    return (
+  } else if (forkNode) {
+    body = (
       <>
         {forkNode.children.map((child, index) => (
           <TreeNodeView
@@ -239,22 +293,63 @@ function BranchPanelContent({
         ))}
       </>
     );
-  }
-
-  if (tree.length === 0) {
-    return (
+  } else if (tree.length === 0) {
+    body = (
       <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
         {t("branchNavigator.noBranches")}
       </div>
     );
   }
 
-  return null;
+  if (!body) return null;
+
+  return (
+    <div style={{ opacity: branchNavigating ? 0.65 : 1, pointerEvents: branchNavigating ? "none" : undefined }}>
+      {body}
+      {branchNavigating && (
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+          {t("branchNavigator.switching")}
+        </div>
+      )}
+      <BranchSummarizeToggle
+        checked={summarizeBeforeSwitch}
+        onChange={onSummarizeBeforeSwitchChange}
+        disabled={branchNavigating}
+        t={t}
+      />
+    </div>
+  );
 }
 
-export function BranchNavigator({ tree, activeLeafId, onLeafChange, gitBranch, inline, containerRef, open: openProp, onToggle, hasSession }: Props) {
+export function BranchNavigator({ tree, activeLeafId, onLeafChange, gitBranch, branchNavigating = false, inline, containerRef, open: openProp, onToggle, hasSession }: Props) {
   const { t } = useI18n();
+  const [summarizeBeforeSwitch, setSummarizeBeforeSwitch] = useState(false);
   const [openInternal, setOpenInternal] = useState(false);
+
+  useEffect(() => {
+    void fetch("/api/preferences")
+      .then((res) => res.json())
+      .then((data: { preferences?: { branchSummarizeBeforeSwitch?: boolean } }) => {
+        const enabled = data.preferences?.branchSummarizeBeforeSwitch === true;
+        setSummarizeBeforeSwitch(enabled);
+        if (data.preferences) cachePiWebPreferences(data.preferences as PiWebPreferences);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSummarizePrefChange = useCallback((next: boolean) => {
+    setSummarizeBeforeSwitch(next);
+    void fetch("/api/preferences", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ branchSummarizeBeforeSwitch: next }),
+    })
+      .then((res) => res.json())
+      .then((data: { preferences?: PiWebPreferences }) => {
+        if (data.preferences) cachePiWebPreferences(data.preferences);
+      })
+      .catch(() => {});
+  }, []);
   const open = openProp !== undefined ? openProp : openInternal;
   const btnRef = useRef<HTMLButtonElement>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -279,8 +374,9 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, gitBranch, i
   );
 
   const handleSelect = useCallback((id: string) => {
+    if (branchNavigating) return;
     onLeafChange(id);
-  }, [onLeafChange]);
+  }, [onLeafChange, branchNavigating]);
 
   const forkNode = useMemo(() => getFirstForkNode(tree), [tree]);
   const showMainBranch = tree.length > 0 && !hasFork(tree);
@@ -362,6 +458,9 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, gitBranch, i
                   showMainBranch={showMainBranch}
                   mainLeafId={mainLeafId}
                   onSelect={handleSelect}
+                  summarizeBeforeSwitch={summarizeBeforeSwitch}
+                  onSummarizeBeforeSwitchChange={handleSummarizePrefChange}
+                  branchNavigating={branchNavigating}
                   t={t}
                 />
               </div>
@@ -419,6 +518,9 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, gitBranch, i
                 showMainBranch={showMainBranch}
                 mainLeafId={mainLeafId}
                 onSelect={handleSelect}
+                summarizeBeforeSwitch={summarizeBeforeSwitch}
+                onSummarizeBeforeSwitchChange={handleSummarizePrefChange}
+                branchNavigating={branchNavigating}
                 t={t}
               />
             </div>

@@ -13,6 +13,7 @@ import { invalidateControlResource } from "@/hooks/useControlCollection";
 import { summarizeForHistory } from "@/lib/history-summary";
 import { useI18n } from "@/lib/i18n/provider";
 import type { ToolMode } from "@/lib/pi-web-preferences";
+import type { SlashCommandEntry } from "@/lib/slash-commands";
 
 interface Props {
   session: SessionInfo | null;
@@ -23,11 +24,13 @@ interface Props {
   modelsRefreshKey?: number;
   chatInputRef?: React.RefObject<ChatInputHandle | null>;
   onBranchDataChange?: (tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => void;
+  onBranchNavigatingChange?: (navigating: boolean) => void;
   onSystemPromptChange?: (prompt: string | null) => void;
   onSessionStatsChange?: (stats: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   toolMode?: ToolMode;
   advancedMode?: boolean;
+  showSlashCommands?: boolean;
   onOpenModels?: () => void;
 }
 
@@ -98,25 +101,25 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, toolMode = "simple", advancedMode = false, onOpenModels }: Props) {
+export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onBranchNavigatingChange, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, toolMode = "simple", advancedMode = false, showSlashCommands = false, onOpenModels }: Props) {
   const { t } = useI18n();
   const {
     loading, error, messages, entryIds, streamState,
     agentRunning, modelNames, modelList, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
-    retryInfo, contextUsage, forkingEntryId,
+    retryInfo, contextUsage, forkingEntryId, cloning,
     isCompacting, compactError, displayModel: displayModelValue, sessionStats,
     agentPhase,
     remoteAuthError,
     isNew,
     messagesEndRef, scrollContainerRef,
     lastUserMsgRef,
-    handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
+    handleSend, handleAbort, handleFork, handleClone, handleNavigate, handleModelChange,
     handleCompact, handleSteer, handleFollowUp, handleAbortCompaction,
     handleToolPresetChange, handleThinkingLevelChange, handleAgentEventRef,
     sessionIdRef,
   } = useAgentSession({
     session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked,
-    modelsRefreshKey, onBranchDataChange, onSystemPromptChange, toolMode,
+    modelsRefreshKey, onBranchDataChange, onBranchNavigatingChange, onSystemPromptChange, toolMode,
   });
 
   const { soundEnabled, onSoundToggle, playDoneSound } = useAudio();
@@ -224,6 +227,35 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   );
   const lastResultSummaryRef = useRef(lastResultSummary);
   lastResultSummaryRef.current = lastResultSummary;
+
+  const [slashCommands, setSlashCommands] = useState<SlashCommandEntry[]>([]);
+  const slashCommandsEnabled = advancedMode && showSlashCommands;
+  const activeSessionId = session?.id ?? sessionIdRef.current ?? null;
+  const activeSessionCwd = session?.cwd ?? newSessionCwd ?? null;
+
+  useEffect(() => {
+    if (!activeSessionId || !slashCommandsEnabled) {
+      setSlashCommands([]);
+      return;
+    }
+    void fetch(`/api/agent/${encodeURIComponent(activeSessionId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "get_commands" }),
+    })
+      .then((res) => res.json())
+      .then((data: { data?: { commands?: SlashCommandEntry[] } }) => {
+        setSlashCommands(data.data?.commands ?? []);
+      })
+      .catch(() => setSlashCommands([]));
+  }, [activeSessionId, slashCommandsEnabled, modelsRefreshKey]);
+
+  const steerMode =
+    agentRunning &&
+    (streamState.isStreaming ||
+      agentPhase?.kind === "running_tools" ||
+      retryInfo != null);
+
   const chatInputElement = (
     <ChatInput
       ref={chatInputRef}
@@ -232,6 +264,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       onSteer={agentRunning ? handleSteer : undefined}
       onFollowUp={agentRunning ? handleFollowUp : undefined}
       isStreaming={agentRunning}
+      steerMode={steerMode}
       model={displayModelValue}
       modelNames={modelNames}
       modelList={modelList}
@@ -251,6 +284,13 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       retryInfo={retryInfo}
       soundEnabled={soundEnabled}
       onSoundToggle={onSoundToggle}
+      onClone={session && !isNew ? handleClone : undefined}
+      cloning={cloning}
+      sessionId={activeSessionId}
+      sessionCwd={activeSessionCwd}
+      slashCommandsEnabled={slashCommandsEnabled && !isNew}
+      slashCommands={slashCommands}
+      onSlashCommand={slashCommandsEnabled ? handleSend : undefined}
     />
   );
 

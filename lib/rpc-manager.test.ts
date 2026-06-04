@@ -89,4 +89,38 @@ describe("AgentSessionWrapper", () => {
     expect(result.filename).toBe("session.html");
     expect(exportToHtml).toHaveBeenCalledOnce();
   });
+
+  it("returns slash commands from inner session sources", async () => {
+    const { AgentSessionWrapper } = await import("./rpc-manager");
+    const inner = {
+      sessionId: "s1",
+      sessionFile: "/tmp/session.jsonl",
+      subscribe: vi.fn(() => vi.fn()),
+      extensionRunner: {
+        getRegisteredCommands: () => [{ invocationName: "foo", description: "Foo cmd" }],
+      },
+      promptTemplates: [{ name: "bar", description: "Bar template" }],
+      resourceLoader: {
+        getSkills: () => ({ skills: [{ name: "baz", description: "Baz skill" }] }),
+      },
+    };
+    const wrapper = new AgentSessionWrapper(inner as never);
+    const result = await wrapper.send({ type: "get_commands" }) as { commands: Array<{ name: string }> };
+    expect(result.commands.map((c) => c.name)).toEqual(["foo", "bar", "skill:baz"]);
+  });
+
+  it("passes summarize to inner.navigateTree", async () => {
+    const navigateTree = vi.fn(async () => ({ cancelled: false }));
+    const inner = {
+      sessionId: "s1",
+      sessionFile: "/tmp/session.jsonl",
+      subscribe: vi.fn(() => vi.fn()),
+      navigateTree,
+    };
+    const { AgentSessionWrapper } = await import("./rpc-manager");
+    const wrapper = new AgentSessionWrapper(inner as never);
+    const result = await wrapper.send({ type: "navigate_tree", targetId: "leaf-2", summarize: true });
+    expect(navigateTree).toHaveBeenCalledWith("leaf-2", { summarize: true });
+    expect(result).toEqual({ cancelled: false });
+  });
 });

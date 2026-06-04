@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **M2 conversation UX**: optional「切换前先总结」on branch switch; **从这里另开一版** (fork) vs **复制为新对话** (clone RPC); timeline blocks for compaction and branch summaries; chat top bar session title; Settings **About** with pi-web / pi-coding-agent versions. Docs: [managing-conversations-and-branches.md](docs/managing-conversations-and-branches.md). Pre-flight: `npm run test:m2` (`PI_M2_TEST_SUMMARIZE=1` for branch-summary model path).
 - **Remote access (LAN/VPN)**: token + pairing-link auth for non-loopback clients. Config in `~/.pi/agent/pi-web-remote.json`; Settings → Remote access panel with QR pairing, master token rotation, allowed hostnames, and paired-device revoke. API: `GET/POST /api/remote`, `POST /api/remote/pair`. CLI: `pi-web --remote`. See [docs/remote-access.md](docs/remote-access.md).
 - **Remote access Phase 2**: Cloudflare/Tailscale tunnel commands in Settings; Web Push on `agent_end` (`/api/push`, `pi-web-push.json`, `public/sw.js`); PWA offline shell via service worker; read-only remote banner via `GET /api/remote/client`.
 - **Remote access Phase 3**: E2EE relay tunnel (`lib/pi-relay`, `npm run relay:*`); remote audit log (`pi-web-remote-audit.jsonl`, `GET /api/remote/audit`); device session labels and revoke-all; paired-device management UI polish.

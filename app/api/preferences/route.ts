@@ -32,6 +32,12 @@ function sanitizePatch(body: unknown): Partial<PiWebPreferences> {
   if (typeof input.autoRetryEnabled === "boolean") {
     patch.autoRetryEnabled = input.autoRetryEnabled;
   }
+  if (typeof input.branchSummarizeBeforeSwitch === "boolean") {
+    patch.branchSummarizeBeforeSwitch = input.branchSummarizeBeforeSwitch;
+  }
+  if (typeof input.showSlashCommands === "boolean") {
+    patch.showSlashCommands = input.showSlashCommands;
+  }
 
   return patch;
 }

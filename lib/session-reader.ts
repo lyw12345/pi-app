@@ -2,7 +2,7 @@ import { SessionManager, buildSessionContext as piBuildSessionContext } from "@e
 import { getAgentDir } from "@/lib/agent-dir";
 import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage } from "./types";
 import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } from "@earendil-works/pi-coding-agent";
-import { normalizeToolCalls } from "./normalize";
+import { normalizeAgentMessage } from "./normalize";
 import { readProductSessionMetadataMap } from "./scene-metadata";
 
 export { getAgentDir };
@@ -168,19 +168,9 @@ export function buildSessionContext(entries: SessionEntry[], leafId?: string | n
     }
   }
 
-  // pi injects compaction summary as {role:"compactionSummary", summary, tokensBefore}.
-  // Convert to {role:"user"} so MessageView can render it the same as before.
-  const messages = (piCtx.messages as AssistantMessage[]).map((msg) => {
-    const raw = msg as unknown as Record<string, unknown>;
-    if (raw.role === "compactionSummary") {
-      return {
-        role: "user" as const,
-        content: `*The conversation history before this point was compacted into the following summary:*\n\n${raw.summary ?? ""}`,
-        timestamp: raw.timestamp as number | undefined,
-      };
-    }
-    return normalizeToolCalls(msg);
-  });
+  const messages = (piCtx.messages as AssistantMessage[]).map((msg) =>
+    normalizeAgentMessage(msg as never),
+  );
 
   return {
     messages,

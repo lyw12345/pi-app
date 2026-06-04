@@ -1,27 +1,18 @@
 #!/usr/bin/env bash
-# Assemble Pi.app: PiWorkbench + pi-web build + embedded Node + production node_modules.
+# Assemble Pi.app: PiWorkbench + clean production pi-web + embedded Node + prod deps only.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="${APP_NAME:-Pi}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist/macos}"
-PI_WEB_BUILD="${PI_WEB_BUILD:-$ROOT}"
 SWIFT_BUILD="${SWIFT_BUILD:-$ROOT/macos/PiWorkbench/.build/release/PiWorkbench}"
 NODE_VERSION="${NODE_VERSION:-22.16.0}"
 SKIP_NODE_EMBED="${SKIP_NODE_EMBED:-0}"
+SKIP_BUILD="${SKIP_BUILD:-0}"
+PACK_NEXT="${PACK_NEXT:-$ROOT/.next-package}"
 
-if [[ ! -f "$PI_WEB_BUILD/bin/pi-web.js" ]]; then
-  echo "error: missing $PI_WEB_BUILD/bin/pi-web.js (run npm run build first)" >&2
-  exit 1
-fi
-
-if [[ ! -f "$PI_WEB_BUILD/.next/BUILD_ID" ]]; then
-  echo "error: missing $PI_WEB_BUILD/.next/BUILD_ID — run 'npm run build' before packaging" >&2
-  exit 1
-fi
-
-if [[ ! -f "$PI_WEB_BUILD/package-lock.json" ]]; then
-  echo "error: missing package-lock.json (required for production deps in the bundle)" >&2
+if [[ ! -f "$ROOT/package-lock.json" ]]; then
+  echo "error: missing package-lock.json" >&2
   exit 1
 fi
 
@@ -30,7 +21,7 @@ if [[ ! -x "$SWIFT_BUILD" ]]; then
   (cd "$ROOT/macos/PiWorkbench" && swift build -c release)
 fi
 
-APP_VERSION="$(node -e "console.log(require('$PI_WEB_BUILD/package.json').version)")"
+APP_VERSION="$(node -e "console.log(require('$ROOT/package.json').version)")"
 
 APP="$OUT_DIR/$APP_NAME.app"
 CONTENTS="$APP/Contents"
@@ -39,23 +30,23 @@ MACOS="$CONTENTS/MacOS"
 NODE_DIR="$RES/node"
 PI_WEB_RES="$RES/pi-web"
 
-rm -rf "$APP"
-mkdir -p "$MACOS" "$PI_WEB_RES" "$NODE_DIR/bin"
-
-cp "$SWIFT_BUILD" "$MACOS/$APP_NAME"
-chmod +x "$MACOS/$APP_NAME"
-
-echo "copying pi-web build artifacts..."
-rsync -a \
-  --exclude node_modules \
-  --exclude .git \
-  "$PI_WEB_BUILD/bin" \
-  "$PI_WEB_BUILD/.next" \
-  "$PI_WEB_BUILD/public" \
-  "$PI_WEB_BUILD/package.json" \
-  "$PI_WEB_BUILD/package-lock.json" \
-  "$PI_WEB_BUILD/next.config.ts" \
-  "$PI_WEB_RES/"
+build_production_next() {
+  if [[ "$SKIP_BUILD" == "1" && -f "$PACK_NEXT/BUILD_ID" ]]; then
+    echo "SKIP_BUILD=1 — reusing $PACK_NEXT"
+    return 0
+  fi
+  rm -rf "$PACK_NEXT"
+  echo "building production .next (isolated, no dev cache)..."
+  # NEXT_DIST_DIR must be relative to repo root; absolute paths are ignored by Next.
+  (cd "$ROOT" && NEXT_DIST_DIR=".next-package" npm run build)
+  rm -rf "$PACK_NEXT/cache" "$PACK_NEXT/dev" 2>/dev/null || true
+  find "$PACK_NEXT" -name "*.map" -delete 2>/dev/null || true
+  if [[ ! -f "$PACK_NEXT/BUILD_ID" ]]; then
+    echo "error: production build failed (no $PACK_NEXT/BUILD_ID)" >&2
+    exit 1
+  fi
+  echo "production .next size: $(du -sh "$PACK_NEXT" | cut -f1)"
+}
 
 embed_node() {
   if [[ "$SKIP_NODE_EMBED" == "1" ]]; then
@@ -86,29 +77,50 @@ embed_node() {
     tar -xzf "$cache_dir/$tarball" -C "$cache_dir"
   fi
 
+  mkdir -p "$NODE_DIR/bin"
   cp "$extract_dir/bin/node" "$node_bin"
   chmod +x "$node_bin"
-  echo "embedded Node at $node_bin ($("$node_bin" -v))"
+  xattr -cr "$NODE_DIR" 2>/dev/null || true
+  echo "embedded Node: $("$node_bin" -v)"
 }
 
-install_pi_web_deps() {
-  if [[ -d "$PI_WEB_BUILD/node_modules/next" ]]; then
-    echo "copying node_modules from $PI_WEB_BUILD..."
-    rsync -a \
-      --exclude .cache \
-      "$PI_WEB_BUILD/node_modules" \
-      "$PI_WEB_RES/"
-    return 0
-  fi
-  echo "node_modules missing at repo root; running npm ci --omit=dev in bundle..."
+install_production_deps() {
+  echo "npm ci --omit=dev in bundle..."
+  rm -rf "$PI_WEB_RES/node_modules"
   (cd "$PI_WEB_RES" && npm ci --omit=dev --ignore-scripts)
+  find "$PI_WEB_RES/node_modules" -name "*.map" -delete 2>/dev/null || true
+  echo "node_modules size: $(du -sh "$PI_WEB_RES/node_modules" | cut -f1)"
 }
+
+build_production_next
+
+rm -rf "$APP"
+mkdir -p "$MACOS" "$PI_WEB_RES" "$NODE_DIR/bin"
+
+cp "$SWIFT_BUILD" "$MACOS/$APP_NAME"
+chmod +x "$MACOS/$APP_NAME"
+
+echo "copying pi-web runtime files..."
+rsync -a \
+  "$ROOT/bin" \
+  "$ROOT/public" \
+  "$ROOT/package.json" \
+  "$ROOT/package-lock.json" \
+  "$ROOT/next.config.ts" \
+  "$PI_WEB_RES/"
+rsync -a \
+  --exclude cache \
+  --exclude dev \
+  --exclude '**/*.map' \
+  "$PACK_NEXT/" \
+  "$PI_WEB_RES/.next/"
 
 embed_node
-install_pi_web_deps
+install_production_deps
+chmod +x "$PI_WEB_RES/bin/pi-web.js" 2>/dev/null || true
 
 if [[ ! -d "$PI_WEB_RES/node_modules/next" ]]; then
-  echo "error: next not found under $PI_WEB_RES/node_modules" >&2
+  echo "error: next not found under bundle node_modules" >&2
   exit 1
 fi
 
@@ -139,13 +151,18 @@ cat > "$CONTENTS/Info.plist" <<EOF
 </plist>
 EOF
 
-# Ad-hoc sign so Gatekeeper is less painful for local installs (not notarized).
+# Clear quarantine; sign only executables (avoid deep-signing huge node_modules).
+xattr -cr "$APP" 2>/dev/null || true
 if command -v codesign >/dev/null 2>&1; then
-  codesign --force --deep -s - "$APP" 2>/dev/null || true
+  codesign --force -s - "$MACOS/$APP_NAME" 2>/dev/null || true
+  if [[ -x "$NODE_DIR/bin/node" ]]; then
+    codesign --force -s - "$NODE_DIR/bin/node" 2>/dev/null || true
+  fi
 fi
 
+TOTAL="$(du -sh "$APP" | cut -f1)"
 echo ""
-echo "assembled $APP"
-echo "install: cp -R \"$APP\" /Applications/   # or drag into Applications"
-echo "first launch (unsigned): xattr -cr \"$APP\"  # if macOS blocks the app"
-echo "open: open \"$APP\""
+echo "assembled $APP ($TOTAL)"
+echo "install (recommended): ditto \"$APP\" /Applications/$APP_NAME.app"
+echo "remove old copy first: rm -rf /Applications/$APP_NAME.app"
+echo "open: open /Applications/$APP_NAME.app"

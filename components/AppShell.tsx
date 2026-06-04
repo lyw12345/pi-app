@@ -9,7 +9,6 @@ import { TabBar, type Tab } from "./TabBar";
 import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { BranchNavigator } from "./BranchNavigator";
-import { WorkbenchHistory } from "./WorkbenchHistory";
 import { WorkbenchHome } from "./WorkbenchHome";
 import { WorkbenchSettings } from "./WorkbenchSettings";
 import { RemotePairingHandler } from "./RemotePairingHandler";
@@ -22,6 +21,8 @@ import { SessionReportButton } from "./SessionReportButton";
 import type { ChatInputHandle } from "./ChatInput";
 import type { ProductHistoryItem } from "@/lib/product-history";
 import type { ToolMode } from "@/lib/pi-web-preferences";
+import { fetchSessionInfo } from "@/lib/fetch-session-info";
+import { hasFork } from "@/lib/branch-tree";
 import { cachePiWebPreferences } from "@/lib/pi-web-preferences-cache";
 
 export function AppShell() {
@@ -41,10 +42,11 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
-  const [workbenchView, setWorkbenchView] = useState<"home" | "history" | "settings" | "chat">("home");
+  const [workbenchView, setWorkbenchView] = useState<"home" | "settings" | "chat">("home");
   const [preferredCwd, setPreferredCwd] = useState<string | null>(null);
   const [toolMode, setToolMode] = useState<ToolMode>("simple");
   const [advancedMode, setAdvancedMode] = useState(false);
+  const [showSlashCommands, setShowSlashCommands] = useState(false);
   const [startingChat, setStartingChat] = useState(false);
   const [startChatError, setStartChatError] = useState<string | null>(null);
   const [sessionRestoreNotice, setSessionRestoreNotice] = useState<string | null>(null);
@@ -53,6 +55,7 @@ export function AppShell() {
   const [branchTree, setBranchTree] = useState<SessionTreeNode[]>([]);
   const [branchActiveLeafId, setBranchActiveLeafId] = useState<string | null>(null);
   const branchLeafChangeFnRef = useRef<((leafId: string | null) => void) | null>(null);
+  const [branchNavigating, setBranchNavigating] = useState(false);
 
   const handleBranchDataChange = useCallback((tree: SessionTreeNode[], activeLeafId: string | null, onLeafChange: (leafId: string | null) => void) => {
     setBranchTree(tree);
@@ -104,6 +107,12 @@ export function AppShell() {
   }, [activeTopPanel]);
 
   useEffect(() => {
+    if (!advancedMode) {
+      setActiveTopPanel((cur) => (cur === "system" ? null : cur));
+    }
+  }, [advancedMode]);
+
+  useEffect(() => {
     const onResize = () => {
       if (window.innerWidth <= 640) setSidebarOpen(false);
     };
@@ -138,7 +147,7 @@ export function AppShell() {
   useEffect(() => {
     void fetch("/api/preferences")
       .then((res) => res.json())
-      .then((data: { preferences?: { defaultWorkspaceCwd?: string; toolMode?: ToolMode } }) => {
+      .then((data: { preferences?: { defaultWorkspaceCwd?: string; toolMode?: ToolMode; showSlashCommands?: boolean } }) => {
         if (data.preferences) {
           cachePiWebPreferences(data.preferences);
         }
@@ -148,6 +157,9 @@ export function AppShell() {
         }
         if (data.preferences?.toolMode) {
           setToolMode(data.preferences.toolMode);
+        }
+        if (data.preferences?.showSlashCommands) {
+          setShowSlashCommands(true);
         }
       })
       .catch(() => {});
@@ -181,6 +193,12 @@ export function AppShell() {
       .then((data: { branch: string | null }) => setGitBranch(data.branch))
       .catch(() => setGitBranch(null));
   }, [activeCwd, selectedSession?.cwd]);
+
+  useEffect(() => {
+    if (!gitBranch && !hasFork(branchTree)) {
+      setActiveTopPanel((cur) => (cur === "branches" ? null : cur));
+    }
+  }, [gitBranch, branchTree]);
 
   const handleCwdChange = useCallback((cwd: string | null) => {
     setActiveCwd(cwd);
@@ -271,15 +289,25 @@ export function AppShell() {
     setExplorerRefreshKey((k) => k + 1);
   }, []);
 
-  const handleSessionForked = useCallback((newSessionId: string) => {
+  const handleSessionRenamed = useCallback((sessionId: string, name: string) => {
+    setRefreshKey((k) => k + 1);
+    setSelectedSession((prev) => (prev?.id === sessionId ? { ...prev, name } : prev));
+  }, []);
+
+  const handleSessionForked = useCallback(async (newSessionId: string) => {
     setRefreshKey((k) => k + 1);
     setSessionKey((k) => k + 1);
     setNewSessionCwd(null);
     setWorkbenchView("chat");
-    setSelectedSession((prev) => ({
-      ...(prev ?? { path: "", cwd: "", created: "", modified: "", messageCount: 0, firstMessage: "" }),
-      id: newSessionId,
-    }));
+    const info = await fetchSessionInfo(newSessionId);
+    if (info) {
+      setSelectedSession(info);
+    } else {
+      setSelectedSession((prev) => ({
+        ...(prev ?? { path: "", cwd: "", created: "", modified: "", messageCount: 0, firstMessage: "" }),
+        id: newSessionId,
+      }));
+    }
     router.replace(`?session=${encodeURIComponent(newSessionId)}`, { scroll: false });
   }, [router]);
 
@@ -315,15 +343,6 @@ export function AppShell() {
     router.replace("/", { scroll: false });
   }, [resetChatChrome, router]);
 
-  const handleOpenHistoryView = useCallback(() => {
-    setSelectedSession(null);
-    setNewSessionCwd(null);
-    setWorkbenchView("history");
-    setSessionKey((k) => k + 1);
-    resetChatChrome();
-    router.replace("/", { scroll: false });
-  }, [resetChatChrome, router]);
-
   const handleOpenSettingsView = useCallback(() => {
     setSelectedSession(null);
     setNewSessionCwd(null);
@@ -337,16 +356,24 @@ export function AppShell() {
     setModelsConfigOpen(true);
   }, []);
 
-  const handleEnterAdvancedMode = useCallback(() => {
-    setAdvancedMode(true);
-    setSidebarOpen(true);
-    setToolMode("full");
+  const handleAdvancedModeChange = useCallback((enabled: boolean) => {
+    setAdvancedMode(enabled);
+    if (enabled) {
+      setSidebarOpen(true);
+      setToolMode("full");
+    } else {
+      setToolMode("simple");
+    }
     void fetch("/api/preferences", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ toolMode: "full" }),
+      body: JSON.stringify({ toolMode: enabled ? "full" : "simple" }),
     });
   }, []);
+
+  const handleEnterAdvancedMode = useCallback(() => {
+    handleAdvancedModeChange(true);
+  }, [handleAdvancedModeChange]);
 
   const handleOpenHistoryItem = useCallback((item: ProductHistoryItem) => {
     setNewSessionCwd(null);
@@ -400,6 +427,8 @@ export function AppShell() {
 
   const activeFileTab = fileTabs.find((t) => t.id === activeFileTabId) ?? null;
   const topBarBackground = "var(--bg-elevated)";
+  const showBranchNavigator = Boolean(gitBranch) || hasFork(branchTree);
+  const showHomeTabActive = workbenchView === "home" && !showChat;
 
   useEffect(() => {
     const view = searchParams.get("view");
@@ -426,6 +455,7 @@ export function AppShell() {
         onInitialRestoreDone={handleInitialRestoreDone}
         refreshKey={refreshKey}
         onSessionDeleted={handleSessionDeleted}
+        onSessionRenamed={handleSessionRenamed}
         pinnedSession={selectedSession}
         selectedCwd={selectedSession?.cwd ?? newSessionCwd ?? activeCwd ?? null}
         onCwdChange={handleCwdChange}
@@ -532,42 +562,41 @@ export function AppShell() {
             )}
           </button>
           <div style={{ display: "flex", alignItems: "center", height: "100%", borderRight: "1px solid var(--border)" }}>
-            {([
-              { id: "home", label: i18nT("appShell.home"), onClick: handleOpenHome },
-              { id: "history", label: i18nT("appShell.history"), onClick: handleOpenHistoryView },
-            ] as const).map((item) => (
-              <button
-                key={item.id}
-                onClick={item.onClick}
-                style={{
-                  height: "100%",
-                  padding: "0 12px",
-                  border: "none",
-                  borderTop: workbenchView === item.id ? "2px solid var(--accent)" : "2px solid transparent",
-                  background: workbenchView === item.id ? "var(--bg-popover)" : topBarBackground,
-                  color: workbenchView === item.id ? "var(--text)" : "var(--text-muted)",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontWeight: 500,
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
+            <button
+              type="button"
+              onClick={handleOpenHome}
+              style={{
+                height: "100%",
+                padding: "0 12px",
+                border: "none",
+                borderTop: showHomeTabActive ? "2px solid var(--accent)" : "2px solid transparent",
+                background: showHomeTabActive ? "var(--bg-popover)" : topBarBackground,
+                color: showHomeTabActive ? "var(--text)" : "var(--text-muted)",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 500,
+              }}
+            >
+              {i18nT("appShell.home")}
+            </button>
           </div>
-          {showChat && (
+          {showChat && (showBranchNavigator || advancedMode) && (
             <div className="chat-branch-tools" style={{ display: "flex", alignItems: "stretch", height: "100%" }}>
-              <BranchNavigator
-                tree={branchTree}
-                activeLeafId={branchActiveLeafId}
-                onLeafChange={handleBranchLeafChange}
-                gitBranch={gitBranch}
-                inline
-                containerRef={topBarRef}
-                open={activeTopPanel === "branches"}
-                onToggle={() => toggleTopPanel("branches")}
-                hasSession
-              />
+              {showBranchNavigator ? (
+                <BranchNavigator
+                  tree={branchTree}
+                  activeLeafId={branchActiveLeafId}
+                  onLeafChange={handleBranchLeafChange}
+                  gitBranch={gitBranch}
+                  branchNavigating={branchNavigating}
+                  inline
+                  containerRef={topBarRef}
+                  open={activeTopPanel === "branches"}
+                  onToggle={() => toggleTopPanel("branches")}
+                  hasSession
+                />
+              ) : null}
+              {advancedMode ? (
               <button
                 ref={systemBtnRef}
                 onClick={() => toggleTopPanel("system")}
@@ -596,6 +625,7 @@ export function AppShell() {
                   <polyline points="2 3.5 5 6.5 8 3.5" />
                 </svg>
               </button>
+              ) : null}
             </div>
           )}
           {showChat && (
@@ -614,7 +644,7 @@ export function AppShell() {
               width: topPanelPos.width,
               zIndex: 500,
             }}>
-              {activeTopPanel === "system" && (
+              {activeTopPanel === "system" && advancedMode && (
                 <div style={{
                   background: "var(--bg-popover)",
                   borderTop: "1px solid var(--border)",
@@ -663,23 +693,25 @@ export function AppShell() {
               modelsRefreshKey={modelsRefreshKey}
               chatInputRef={chatInputRef}
               onBranchDataChange={handleBranchDataChange}
+              onBranchNavigatingChange={setBranchNavigating}
               onSystemPromptChange={handleSystemPromptChange}
               onSessionStatsChange={handleSessionStatsChange}
               onContextUsageChange={handleContextUsageChange}
               toolMode={toolMode}
               advancedMode={advancedMode}
+              showSlashCommands={showSlashCommands}
               onOpenModels={handleOpenModelsConfig}
             />
           ) : showPlaceholder ? (
-            workbenchView === "history" ? (
-              <WorkbenchHistory onOpenHistory={handleOpenHistoryItem} />
-            ) : workbenchView === "settings" ? (
+            workbenchView === "settings" ? (
               <WorkbenchSettings
                 onOpenModels={handleOpenModelsConfig}
                 onOpenSkills={() => setSkillsConfigOpen(true)}
-                onEnterAdvancedMode={handleEnterAdvancedMode}
+                onAdvancedModeChange={handleAdvancedModeChange}
                 advancedMode={advancedMode}
                 skillsDisabled={settingsSkillsDisabled}
+                showSlashCommands={showSlashCommands}
+                onShowSlashCommandsChange={setShowSlashCommands}
               />
             ) : (
               <WorkbenchHome

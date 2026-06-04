@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "exportedAt": "2026-06-04T08:00:00.000Z",
+  "piWebVersion": "2.1.0",
+  "scenes": {
+    "report-generation": {
+      "outputStyle": "Markdown sections with H2/H3 hierarchy and a one-line TL;DR.",
+      "suggestedStarters": [
+        "Compile this week's report",
+        "Summarize last week's call notes"
+      ]
+    },
+    "enterprise-knowledge": {
+      "defaultPrompt": "Answer from internal docs only; cite file paths when possible.",
+      "suggestedStarters": [
+        "What does our refund policy say?",
+        "Find the onboarding checklist"
+      ]
+    }
+  }
+}

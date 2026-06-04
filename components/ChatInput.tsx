@@ -1,8 +1,21 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, KeyboardEvent } from "react";
+import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, KeyboardEvent, useMemo } from "react";
 import { useI18n } from "@/lib/i18n/provider";
+import type { TranslationKey } from "@/lib/i18n";
 import type { ToolMode } from "@/lib/pi-web-preferences";
+import { downloadHtmlBlob, fetchSessionHtmlExport } from "@/lib/download-export-html";
+import {
+  filterSlashCommands,
+  getSlashCompletionAtCursor,
+  type SlashCommandEntry,
+} from "@/lib/slash-commands";
+
+function displayCompactError(compactError: string | null, t: (key: TranslationKey) => string): string | null {
+  if (!compactError) return null;
+  if (compactError.startsWith("branchNavigator.")) return t(compactError as TranslationKey);
+  return compactError;
+}
 
 export interface AttachedImage {
   data: string;   // base64, no prefix
@@ -21,7 +34,10 @@ interface Props {
   onAbort: () => void;
   onSteer?: (message: string, images?: AttachedImage[]) => void;
   onFollowUp?: (message: string, images?: AttachedImage[]) => void;
+  /** Agent loop active: stop button, queued send, disabled attach. */
   isStreaming: boolean;
+  /** Token/tool/retry phase: Steer/Follow-up chrome (orange border, inline buttons). */
+  steerMode?: boolean;
   model?: { provider: string; modelId: string } | null;
   modelNames?: Record<string, string>;
   modelList?: { id: string; name: string; provider: string }[];
@@ -41,6 +57,13 @@ interface Props {
   retryInfo?: { attempt: number; maxAttempts: number; errorMessage?: string } | null;
   soundEnabled?: boolean;
   onSoundToggle?: () => void;
+  onClone?: () => void;
+  cloning?: boolean;
+  sessionCwd?: string | null;
+  sessionId?: string | null;
+  slashCommandsEnabled?: boolean;
+  slashCommands?: SlashCommandEntry[];
+  onSlashCommand?: (message: string) => void;
 }
 
 export interface ChatInputHandle {
@@ -54,21 +77,36 @@ const TOOL_PRESET_MAP: Record<"off" | "default" | "full", "none" | "default" | "
 
 const THINKING_LEVELS = ["auto", "off", "minimal", "low", "medium", "high", "xhigh"] as const;
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
-  onSend, onAbort, onSteer, onFollowUp, isStreaming, model, modelNames, modelList, onModelChange,
+  onSend, onAbort, onSteer, onFollowUp, isStreaming, steerMode = false, model, modelNames, modelList, onModelChange,
   onCompact, onAbortCompaction, isCompacting, compactError, toolPreset, onToolPresetChange, showAdvancedTools = false,
   thinkingLevel, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   retryInfo,
   soundEnabled, onSoundToggle,
+  onClone, cloning = false,
+  sessionCwd = null,
+  sessionId = null,
+  slashCommandsEnabled = false,
+  slashCommands = [],
+  onSlashCommand,
 }: Props, ref) {
   const { t } = useI18n();
+  const compactErrorLabel = displayCompactError(compactError ?? null, t);
   const [value, setValue] = useState("");
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [modelDropdownRect, setModelDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
   const [thinkingDropdownOpen, setThinkingDropdownOpen] = useState(false);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [cursorPos, setCursorPos] = useState(0);
+  const [slashHighlight, setSlashHighlight] = useState(0);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [skills, setSkills] = useState<Array<{ name: string; description?: string }>>([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const [exportingHtml, setExportingHtml] = useState(false);
+  const [exportHtmlError, setExportHtmlError] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const skillsDropdownRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const modelDropdownPanelRef = useRef<HTMLDivElement>(null);
   const toolDropdownRef = useRef<HTMLDivElement>(null);
@@ -178,20 +216,112 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   }, [value, attachedImages, onSteer, onFollowUp, clearImages]);
 
+  const slashCompletion = useMemo(
+    () => (slashCommandsEnabled ? getSlashCompletionAtCursor(value, cursorPos) : null),
+    [slashCommandsEnabled, value, cursorPos],
+  );
+  const filteredSlashCommands = useMemo(
+    () => (slashCompletion ? filterSlashCommands(slashCommands, slashCompletion.query) : []),
+    [slashCommands, slashCompletion],
+  );
+  const slashMenuOpen = Boolean(slashCompletion && filteredSlashCommands.length > 0);
+
+  useEffect(() => {
+    setSlashHighlight(0);
+  }, [slashCompletion?.query]);
+
+  const syncCursor = useCallback(() => {
+    const ta = textareaRef.current;
+    if (ta) setCursorPos(ta.selectionStart ?? ta.value.length);
+  }, []);
+
+  const applySlashCommand = useCallback((name: string) => {
+    if (!slashCompletion || !onSlashCommand) return;
+    const slashIdx = slashCompletion.replaceStart - 1;
+    const next = value.slice(0, slashIdx) + value.slice(cursorPos);
+    setValue(next);
+    onSlashCommand(`/${name}`);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [slashCompletion, onSlashCommand, value, cursorPos]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (slashMenuOpen) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSlashHighlight((i) => (i + 1) % filteredSlashCommands.length);
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSlashHighlight((i) => (i - 1 + filteredSlashCommands.length) % filteredSlashCommands.length);
+          return;
+        }
+        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+          e.preventDefault();
+          const picked = filteredSlashCommands[slashHighlight];
+          if (picked) applySlashCommand(picked.name);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          return;
+        }
+      }
       if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
         e.preventDefault();
-        if (isStreaming && (onSteer || onFollowUp)) {
-          // Default Enter sends as steer if available, else followup
+        if (steerMode && (onSteer || onFollowUp)) {
           sendQueued(onSteer ? "steer" : "followup");
+        } else if (isStreaming && onFollowUp) {
+          sendQueued("followup");
         } else {
           handleSend();
         }
       }
     },
-    [isStreaming, onSteer, onFollowUp, sendQueued, handleSend]
+    [
+      slashMenuOpen,
+      filteredSlashCommands,
+      slashHighlight,
+      applySlashCommand,
+      isStreaming,
+      steerMode,
+      onSteer,
+      onFollowUp,
+      sendQueued,
+      handleSend,
+    ],
   );
+
+  useEffect(() => {
+    if (!skillsOpen || !sessionCwd) return;
+    setSkillsLoading(true);
+    void fetch(`/api/skills?cwd=${encodeURIComponent(sessionCwd)}`)
+      .then((res) => res.json())
+      .then((data: { skills?: Array<{ name: string; description?: string }> }) => {
+        setSkills(data.skills ?? []);
+      })
+      .catch(() => setSkills([]))
+      .finally(() => setSkillsLoading(false));
+  }, [skillsOpen, sessionCwd]);
+
+  const handleExportHtml = useCallback(async () => {
+    if (!sessionId || exportingHtml) return;
+    if (isStreaming) {
+      setExportHtmlError(t("chatInput.exportHtmlStreaming"));
+      return;
+    }
+    setExportingHtml(true);
+    setExportHtmlError(null);
+    try {
+      const { blob, filename } = await fetchSessionHtmlExport(sessionId);
+      downloadHtmlBlob(blob, filename);
+    } catch (err) {
+      setExportHtmlError(err instanceof Error ? err.message : t("chatInput.exportHtmlFailed"));
+    } finally {
+      setExportingHtml(false);
+    }
+  }, [sessionId, exportingHtml, isStreaming, t]);
 
   const handleInput = useCallback(() => {
     const ta = textareaRef.current;
@@ -250,6 +380,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       if (thinkingDropdownRef.current && !thinkingDropdownRef.current.contains(e.target as Node)) {
         setThinkingDropdownOpen(false);
       }
+      if (skillsDropdownRef.current && !skillsDropdownRef.current.contains(e.target as Node)) {
+        setSkillsOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -281,6 +414,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       />
       <div style={{ maxWidth: 820, margin: "0 auto" }}>
         {/* Retry banner */}
+        {exportHtmlError && (
+          <div style={{
+            marginBottom: 8, padding: "5px 10px",
+            background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
+            borderRadius: 6, fontSize: 12, color: "rgba(220,80,80,0.95)",
+          }}>
+            {exportHtmlError}
+          </div>
+        )}
         {retryInfo && (
           <div style={{
             marginBottom: 8, padding: "5px 10px",
@@ -327,6 +469,50 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           </div>
         )}
 
+        {slashMenuOpen && (
+          <div
+            style={{
+              marginBottom: 6,
+              maxHeight: 200,
+              overflow: "auto",
+              background: "var(--bg)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              boxShadow: "0 -4px 16px rgba(0,0,0,0.10)",
+            }}
+          >
+            {filteredSlashCommands.map((cmd, index) => (
+              <button
+                key={`${cmd.source}-${cmd.name}`}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  applySlashCommand(cmd.name);
+                }}
+                style={{
+                  display: "flex",
+                  width: "100%",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: 2,
+                  padding: "8px 12px",
+                  background: index === slashHighlight ? "var(--bg-selected)" : "none",
+                  border: "none",
+                  color: "var(--text)",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  textAlign: "left",
+                }}
+              >
+                <span style={{ fontFamily: "var(--font-mono)" }}>/{cmd.name}</span>
+                {cmd.description ? (
+                  <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{cmd.description}</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Main input */}
         <div
           style={{
@@ -334,7 +520,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             gap: 8,
             alignItems: "center",
             background: "var(--bg-elevated)",
-            border: `1px solid ${isStreaming && (onSteer || onFollowUp)
+            border: `1px solid ${steerMode && (onSteer || onFollowUp)
               ? "rgba(255,149,0,0.45)"
               : "var(--border-strong)"}`,
             borderRadius: 18,
@@ -348,12 +534,18 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setCursorPos(e.target.selectionStart ?? e.target.value.length);
+            }}
             onKeyDown={handleKeyDown}
+            onKeyUp={syncCursor}
+            onClick={syncCursor}
+            onSelect={syncCursor}
             onInput={handleInput}
             onPaste={handlePaste}
             placeholder={
-              isStreaming && (onSteer || onFollowUp)
+              steerMode && (onSteer || onFollowUp)
                 ? t("chatInput.placeholderSteer")
                 : isStreaming ? t("chatInput.placeholderRunning")
                 : t("chatInput.placeholderDefault")
@@ -375,7 +567,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             }}
           />
 
-          {isStreaming ? (
+          {steerMode ? (
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, alignSelf: "flex-end" }}>
               {onSteer && (
                 <button
@@ -425,7 +617,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 </button>
               )}
             </div>
-          ) : (
+          ) : !isStreaming ? (
             <button
               onClick={handleSend}
               disabled={!value.trim() && !attachedImages.length}
@@ -452,7 +644,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               </svg>
               {t("chatInput.send")}
             </button>
-          )}
+          ) : null}
         </div>
 
         {/* Bottom bar: left | center (context) | right */}
@@ -775,9 +967,130 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               </div>
             )}
 
+            {sessionCwd && !isStreaming && (
+              <div ref={skillsDropdownRef} style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  onClick={() => setSkillsOpen((v) => !v)}
+                  title={t("chatInput.insertSkill")}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "8px 12px", height: 32,
+                    background: skillsOpen ? "var(--bg-hover)" : "none",
+                    border: "none", borderRadius: 9,
+                    color: "var(--text-muted)",
+                    cursor: "pointer", fontSize: 12,
+                  }}
+                >
+                  {t("chatInput.insertSkill")}
+                </button>
+                {skillsOpen && (
+                  <div style={{
+                    position: "absolute", bottom: "calc(100% + 6px)", right: 0,
+                    zIndex: 100, background: "var(--bg)", border: "1px solid var(--border)",
+                    borderRadius: 8, boxShadow: "0 -4px 16px rgba(0,0,0,0.10)",
+                    minWidth: 200, maxHeight: 240, overflowY: "auto",
+                  }}>
+                    {skillsLoading && (
+                      <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-dim)" }}>{t("common.loading")}</div>
+                    )}
+                    {!skillsLoading && skills.length === 0 && (
+                      <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-dim)" }}>{t("chatInput.insertSkillEmpty")}</div>
+                    )}
+                    {skills.map((skill) => (
+                      <button
+                        key={skill.name}
+                        type="button"
+                        onClick={() => {
+                          setSkillsOpen(false);
+                          const ref = textareaRef.current;
+                          const insert = `/skill:${skill.name}`;
+                          if (ref) {
+                            const start = ref.selectionStart ?? ref.value.length;
+                            const end = ref.selectionEnd ?? ref.value.length;
+                            const before = ref.value.slice(0, start);
+                            const after = ref.value.slice(end);
+                            const sep = before.length > 0 && !before.endsWith(" ") ? " " : "";
+                            const newVal = before + sep + insert + after;
+                            setValue(newVal);
+                            requestAnimationFrame(() => {
+                              const pos = start + sep.length + insert.length;
+                              ref.setSelectionRange(pos, pos);
+                              ref.focus();
+                            });
+                          } else {
+                            setValue((v) => v + (v ? " " : "") + insert);
+                          }
+                        }}
+                        style={{
+                          display: "block", width: "100%", padding: "7px 12px",
+                          background: "none", border: "none", textAlign: "left",
+                          color: "var(--text)", cursor: "pointer", fontSize: 12,
+                        }}
+                      >
+                        <span style={{ fontFamily: "var(--font-mono)" }}>{skill.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {sessionId && !isStreaming && (
+              <button
+                type="button"
+                onClick={() => void handleExportHtml()}
+                disabled={exportingHtml}
+                title={t("chatInput.exportHtmlTitle")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "8px 12px", height: 32,
+                  background: "none", border: "none", borderRadius: 9,
+                  color: exportingHtml ? "var(--accent)" : "var(--text-muted)",
+                  cursor: exportingHtml ? "not-allowed" : "pointer",
+                  fontSize: 12, whiteSpace: "nowrap",
+                }}
+              >
+                {exportingHtml ? t("settings.exporting") : t("chatInput.exportHtml")}
+              </button>
+            )}
+
+            {!isStreaming && onClone && (
+              <button
+                type="button"
+                onClick={onClone}
+                disabled={cloning}
+                title={t("appShell.cloneSessionTitle")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "8px 12px",
+                  height: 32,
+                  background: "none",
+                  border: "none",
+                  borderRadius: 9,
+                  color: cloning ? "var(--accent)" : "var(--text-muted)",
+                  cursor: cloning ? "not-allowed" : "pointer",
+                  fontSize: 12,
+                  whiteSpace: "nowrap",
+                  transition: "background 0.12s, color 0.12s",
+                }}
+                onMouseEnter={(e) => {
+                  if (cloning) return;
+                  e.currentTarget.style.background = "var(--bg-hover)";
+                  e.currentTarget.style.color = "var(--text)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "none";
+                  e.currentTarget.style.color = cloning ? "var(--accent)" : "var(--text-muted)";
+                }}
+              >
+                {cloning ? t("appShell.cloningSession") : t("appShell.cloneSession")}
+              </button>
+            )}
+
             {!isStreaming && onCompact && (
               <div style={{ position: "relative" }}>
-                {compactError && (
+                {compactErrorLabel && (
                   <div style={{
                     position: "absolute", bottom: "calc(100% + 6px)", right: 0,
                     background: "#1f2937", color: "#f87171",
@@ -785,7 +1098,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                     whiteSpace: "nowrap", pointerEvents: "none",
                     boxShadow: "0 2px 8px rgba(0,0,0,0.2)", zIndex: 50,
                   }}>
-                    {compactError}
+                    {compactErrorLabel}
                   </div>
                 )}
                 <button

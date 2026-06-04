@@ -92,7 +92,15 @@ export interface CustomMessage {
   timestamp?: number;
 }
 
-export type AgentMessage = UserMessage | AssistantMessage | ToolResultMessage | CustomMessage;
+/** Compaction or branch-switch summary shown in the timeline (not a real user turn). */
+export interface TimelineSummaryMessage {
+  role: "timelineSummary";
+  kind: "compaction" | "branch";
+  summary: string;
+  timestamp?: number;
+}
+
+export type AgentMessage = UserMessage | AssistantMessage | ToolResultMessage | CustomMessage | TimelineSummaryMessage;
 
 export interface SessionMessageEntry extends SessionEntryBase {
   type: "message";

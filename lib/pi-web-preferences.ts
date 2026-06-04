@@ -10,6 +10,10 @@ export interface PiWebPreferences {
   notificationsEnabled?: boolean;
   autoCompactionEnabled?: boolean;
   autoRetryEnabled?: boolean;
+  /** When true, in-session branch switches call navigate_tree with summarize (default off). */
+  branchSummarizeBeforeSwitch?: boolean;
+  /** When true with advanced mode, ChatInput shows / command completion (default off). */
+  showSlashCommands?: boolean;
 }
 
 export const PI_WEB_PREFERENCES_FILENAME = "pi-web-preferences.json";

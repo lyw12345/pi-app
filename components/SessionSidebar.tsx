@@ -17,6 +17,7 @@ interface Props {
   onInitialRestoreDone?: (found: boolean) => void;
   refreshKey?: number;
   onSessionDeleted?: (sessionId: string) => void;
+  onSessionRenamed?: (sessionId: string, name: string) => void;
   /** Active session from AppShell — shown immediately before /api/sessions catches up */
   pinnedSession?: SessionInfo | null;
   selectedCwd?: string | null;
@@ -206,7 +207,7 @@ function PiAgentTitle() {
   );
 }
 
-export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, onOpenSettings, isSettingsView = false, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, pinnedSession, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention }: Props) {
+export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, onOpenSettings, isSettingsView = false, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, onSessionRenamed, pinnedSession, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention }: Props) {
   const { t } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -741,7 +742,10 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             node={node}
             selectedSessionId={selectedSessionId}
             onSelectSession={onSelectSession}
-            onRenamed={loadSessions}
+            onRenamed={(id, name) => {
+              onSessionRenamed?.(id, name);
+              loadSessions();
+            }}
             onSessionDeleted={(id) => {
               onSessionDeleted?.(id);
               loadSessions();
@@ -899,7 +903,7 @@ function SessionTreeItem({
   node: SessionTreeNode;
   selectedSessionId: string | null;
   onSelectSession: (s: SessionInfo) => void;
-  onRenamed?: () => void;
+  onRenamed?: (sessionId: string, name: string) => void;
   onSessionDeleted?: (id: string) => void;
   depth: number;
 }) {
@@ -965,7 +969,7 @@ function SessionItem({
   session: SessionInfo;
   isSelected: boolean;
   onClick: () => void;
-  onRenamed?: () => void;
+  onRenamed?: (sessionId: string, name: string) => void;
   onDeleted?: (id: string) => void;
   depth?: number;
   hasChildren?: boolean;
@@ -999,7 +1003,7 @@ function SessionItem({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      onRenamed?.();
+      onRenamed?.(session.id, name);
     } catch {
       // ignore
     }

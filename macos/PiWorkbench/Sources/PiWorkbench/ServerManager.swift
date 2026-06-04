@@ -58,8 +58,8 @@ final class ServerManager: ObservableObject {
   func start() async {
     state = .starting
     stop()
-    guard spawn() else {
-      state = .failed("无法启动 pi-web（未找到 node 或 bin/pi-web.js）")
+    if let message = spawn() {
+      state = .failed(message)
       return
     }
     let ok = await waitForHealth(timeoutSeconds: 60)
@@ -67,7 +67,7 @@ final class ServerManager: ObservableObject {
       state = .ready
     } else {
       stop()
-      state = .failed("pi-web 在 60 秒内未就绪，请检查 Node 与端口 \(port)")
+      state = .failed("pi-web 在 60 秒内未就绪，请检查端口 \(port) 是否被占用")
     }
   }
 
@@ -93,10 +93,36 @@ final class ServerManager: ObservableObject {
     NSWorkspace.shared.open(agentDir)
   }
 
-  private func spawn() -> Bool {
+  func showAbout() async {
+    let healthURL = URL(string: "http://\(host):\(port)/api/health")!
+    var piWebVersion = "—"
+    var piVersion = "—"
+    if let (data, _) = try? await URLSession.shared.data(from: healthURL),
+       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+      if let v = json["version"] as? String { piWebVersion = v }
+      if let v = json["piVersion"] as? String { piVersion = v }
+    }
+    let alert = NSAlert()
+    alert.messageText = "Pi Workbench"
+    alert.informativeText = "pi-web \(piWebVersion)\n@mariozechner/pi-coding-agent \(piVersion)"
+    alert.alertStyle = .informational
+    alert.addButton(withTitle: "好")
+    alert.runModal()
+  }
+
+  /// Returns an error message on failure, nil on success.
+  private func spawn() -> String? {
     let script = piWebRoot.appendingPathComponent("bin/pi-web.js")
-    guard FileManager.default.fileExists(atPath: script.path) else { return false }
-    guard let nodeURL, FileManager.default.isExecutableFile(atPath: nodeURL.path) else { return false }
+    let fm = FileManager.default
+    guard fm.fileExists(atPath: script.path) else {
+      return "未找到 pi-web：\(script.path)\n请用 ditto 重新安装 Pi.app"
+    }
+    guard let nodeURL else {
+      return "未找到 Node。请用最新 dist/macos/Pi.app 覆盖安装（内嵌 Node）"
+    }
+    guard fm.fileExists(atPath: nodeURL.path) else {
+      return "未找到 Node：\(nodeURL.path)"
+    }
 
     let proc = Process()
     proc.executableURL = nodeURL
@@ -104,14 +130,15 @@ final class ServerManager: ObservableObject {
     var env = ProcessInfo.processInfo.environment
     env["HOST"] = host
     env["PORT"] = String(port)
+    env["NODE"] = nodeURL.path
     proc.environment = env
     proc.currentDirectoryURL = piWebRoot
     do {
       try proc.run()
       process = proc
-      return true
+      return nil
     } catch {
-      return false
+      return "启动 pi-web 失败：\(error.localizedDescription)"
     }
   }
 
@@ -138,8 +165,18 @@ final class ServerManager: ObservableObject {
     }
   }
 
+  private static func resourcesURL() -> URL? {
+    if let url = Bundle.main.resourceURL {
+      return url
+    }
+    let bundlePath = Bundle.main.bundlePath
+    guard !bundlePath.isEmpty else { return nil }
+    return URL(fileURLWithPath: bundlePath, isDirectory: true)
+      .appendingPathComponent("Contents/Resources", isDirectory: true)
+  }
+
   private static func bundledPiWebRoot() -> URL? {
-    guard let resources = Bundle.main.resourceURL else { return nil }
+    guard let resources = resourcesURL() else { return nil }
     let root = resources.appendingPathComponent("pi-web", isDirectory: true)
     let script = root.appendingPathComponent("bin/pi-web.js")
     if FileManager.default.fileExists(atPath: script.path) {
@@ -149,22 +186,29 @@ final class ServerManager: ObservableObject {
   }
 
   private static func bundledNodeURL() -> URL? {
-    guard let resources = Bundle.main.resourceURL else { return nil }
+    guard let resources = resourcesURL() else { return nil }
     let node = resources
       .appendingPathComponent("node", isDirectory: true)
       .appendingPathComponent("bin/node")
-    if FileManager.default.isExecutableFile(atPath: node.path) {
+    if FileManager.default.fileExists(atPath: node.path) {
       return node
     }
     return nil
   }
 
+  private static func isAppBundle() -> Bool {
+    Bundle.main.bundlePath.hasSuffix(".app")
+  }
+
   private static func resolvePiWebRoot() -> URL {
-    if let raw = ProcessInfo.processInfo.environment["PI_WEB_ROOT"], !raw.isEmpty {
-      return URL(fileURLWithPath: raw, isDirectory: true)
-    }
     if let bundled = bundledPiWebRoot() {
       return bundled
+    }
+    if !isAppBundle(),
+       let raw = ProcessInfo.processInfo.environment["PI_WEB_ROOT"],
+       !raw.isEmpty
+    {
+      return URL(fileURLWithPath: raw, isDirectory: true)
     }
     let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
     let candidates = [
@@ -182,12 +226,15 @@ final class ServerManager: ObservableObject {
   }
 
   private static func resolveNode() -> URL? {
-    if let raw = ProcessInfo.processInfo.environment["NODE"], !raw.isEmpty {
-      let url = URL(fileURLWithPath: raw)
-      if FileManager.default.isExecutableFile(atPath: url.path) { return url }
-    }
     if let bundled = bundledNodeURL() {
       return bundled
+    }
+    if !isAppBundle(),
+       let raw = ProcessInfo.processInfo.environment["NODE"],
+       !raw.isEmpty
+    {
+      let url = URL(fileURLWithPath: raw)
+      if FileManager.default.fileExists(atPath: url.path) { return url }
     }
     let candidates = [
       "/opt/homebrew/bin/node",
