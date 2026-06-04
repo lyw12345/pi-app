@@ -51,6 +51,33 @@ Do **not** run `next dev` on 30141 while developing on 30142 — both watch the 
 ### Test files
 All test files that mock localhost must use port **30142**, not 30141. Search for `127.0.0.1:30142` or `localhost:30142` to find them.
 
+### Three `.next` directories (easy to ship the wrong UI)
+
+| Directory | Written by | Consumed by |
+|-----------|------------|-------------|
+| `.next-dev-30142` | `npm run dev` | **30142** only |
+| `.next` | `npm run build` (default `NEXT_DIST_DIR`) | **`npm start` / `pi-web` on 30141** |
+| `.next-package` | `npm run package:macos` (`NEXT_DIST_DIR=.next-package`) | **copied into `Pi.app` → `Resources/pi-web/.next`** |
+
+**30142 looking correct does not update 30141 or Pi.app.** After UI/API changes that should reach daily use, always `npm run build` (refreshes `.next`) before `npm start` or packaging.
+
+### Packaging / 30141 — do not repeat the stale-server mistake
+
+**Failure mode we hit:** `ditto` replaced `Pi.app` on disk while an old `next start` on **30141** kept running. `/api/health` still returned `ok`, so the shell treated the server as ready, but HTML referenced **old chunk hashes** that no longer exist on disk → 404 JS, UI looks like an old build (missing features such as file attach).
+
+**Before claiming a macOS install or 30141 refresh succeeded:**
+
+1. Stop listeners on 30141: `osascript -e 'quit app "Pi"'`; `lsof -ti tcp:30141 | xargs kill -TERM` (wait until port is free).
+2. Refresh production artifacts:
+   - Daily **30141** in repo: `npm run build` then `npm start` (uses `.next`, not `.next-package`).
+   - **Pi.app**: `npm run package:macos` (no `SKIP_BUILD=1` after code changes). Script rebuilds Swift when `macos/PiWorkbench/Sources/**` is newer than the release binary.
+3. Install: `rm -rf /Applications/Pi.app && ditto dist/macos/Pi.app /Applications/Pi.app && xattr -cr /Applications/Pi.app`
+4. **Verify UI, not just health:** `curl -s http://127.0.0.1:30141/` → take a `/_next/static/chunks/app/page-*.js` URL → confirm that file exists under the serving tree **and** contains the expected symbol (e.g. `rg attachFile` on the served chunk). Mismatch between HTML chunk name and files on disk means a zombie `next-server` — go back to step 1.
+
+`ServerManager` now calls `terminateStaleListenersOnPort()` before spawn so a new Pi.app launch clears orphaned 30141 processes; still quit Pi and free the port when replacing the bundle manually.
+
+**Never:** tell the user Pi.app or 30141 is updated after packaging alone without killing the old process and running the verification above.
+
 ---
 
 ## Architecture

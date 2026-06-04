@@ -120,7 +120,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const modelDropdownPanelRef = useRef<HTMLDivElement>(null);
   const toolDropdownRef = useRef<HTMLDivElement>(null);
   const thinkingDropdownRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const generalFileInputRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(ref, () => ({
@@ -159,14 +158,10 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       });
     },
     addImages(files: File[]) {
-      processImageFiles(files);
+      void processGeneralFiles(files);
     },
     addFiles(files: File[]) {
-      const imageFiles = files.filter((f) => f.type.startsWith("image/"));
-      const otherFiles = files.filter((f) => !f.type.startsWith("image/"));
-      if (imageFiles.length && supportsImages) void processImageFiles(imageFiles);
-      if (otherFiles.length) void processGeneralFiles(otherFiles);
-      else if (imageFiles.length && !supportsImages) void processGeneralFiles(imageFiles);
+      void processGeneralFiles(files);
     },
   }));
 
@@ -466,23 +461,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         paddingRight: 52, // 16px base + 36px for ChatMinimap alignment
       }}
     >
-      {/* Hidden file inputs */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        style={{ display: "none" }}
-        onChange={(e) => {
-          if (!supportsImages) {
-            e.target.value = "";
-            return;
-          }
-          const files = Array.from(e.target.files ?? []);
-          processImageFiles(files);
-          e.target.value = "";
-        }}
-      />
+      {/* Hidden file input (browser fallback when piNative.pickFiles unavailable) */}
       <input
         ref={generalFileInputRef}
         type="file"
@@ -781,36 +760,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-              </svg>
-            </button>
-            <button
-              onClick={() => supportsImages && fileInputRef.current?.click()}
-              disabled={isStreaming || !supportsImages}
-              title={supportsImages ? t("chatInput.attachImage") : t("chatInput.imagesNotSupported")}
-              style={{
-                flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                width: 32, height: 32, padding: 0,
-                background: "none", border: "none",
-                borderRadius: 9,
-                color: attachedImages.length ? "var(--accent)" : "var(--text-muted)",
-                cursor: isStreaming || !supportsImages ? "not-allowed" : "pointer",
-                opacity: isStreaming || !supportsImages ? 0.5 : 1,
-                transition: "background 0.12s, color 0.12s",
-              }}
-              onMouseEnter={(e) => {
-                if (isStreaming || !supportsImages) return;
-                e.currentTarget.style.background = "var(--bg-hover)";
-                e.currentTarget.style.color = attachedImages.length ? "var(--accent)" : "var(--text)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "none";
-                e.currentTarget.style.color = attachedImages.length ? "var(--accent)" : "var(--text-muted)";
-              }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
               </svg>
             </button>
             {/* Model selector — visible always, disabled during streaming */}

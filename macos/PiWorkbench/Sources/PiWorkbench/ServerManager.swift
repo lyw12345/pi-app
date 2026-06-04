@@ -58,6 +58,7 @@ final class ServerManager: ObservableObject {
   func start() async {
     state = .starting
     stop()
+    terminateStaleListenersOnPort()
     if let message = spawn() {
       state = .failed(message)
       return
@@ -108,6 +109,31 @@ final class ServerManager: ObservableObject {
     alert.alertStyle = .informational
     alert.addButton(withTitle: "好")
     alert.runModal()
+  }
+
+  /// Kill any process still bound to our port (e.g. old `next start` after Pi.app was replaced on disk).
+  private func terminateStaleListenersOnPort() {
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+    task.arguments = ["-ti", "tcp:\(port)"]
+    let pipe = Pipe()
+    task.standardOutput = pipe
+    task.standardError = FileHandle.nullDevice
+    do {
+      try task.run()
+      task.waitUntilExit()
+    } catch {
+      return
+    }
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    guard let text = String(data: data, encoding: .utf8) else { return }
+    let pids = text.split(whereSeparator: \.isNewline).compactMap { Int32($0.trimmingCharacters(in: .whitespaces)) }
+    for pid in pids where pid != ProcessInfo.processInfo.processIdentifier {
+      kill(pid, SIGTERM)
+    }
+    if !pids.isEmpty {
+      Thread.sleep(forTimeInterval: 0.4)
+    }
   }
 
   /// Returns an error message on failure, nil on success.

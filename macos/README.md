@@ -49,18 +49,25 @@ npm run package:macos
 
 脚本会：
 
-1. 在 `dist/macos/.next-release` 做**干净生产构建**（不打包 `.next/dev`、`.next/cache`）
-2. `swift build -c release`（PiWorkbench）
+1. 在仓库根 `.next-package` 做**干净生产构建**（不打包 dev/cache；与日常 `npm run build` 写入的 `.next` 是两套目录）
+2. 若 `macos/PiWorkbench/Sources/**` 比 release 二进制新，则 `swift build -c release`
 3. 在 bundle 内 `npm ci --omit=dev`（不复制开发用 `node_modules`）
 4. 嵌入 Node（默认 v22.16.0）并 `xattr -cr` + 仅签名可执行文件
 
 安装与首次打开（**用 `ditto`，大体积 `cp -R` 易失败**）：
 
 ```bash
+osascript -e 'quit app "Pi"' 2>/dev/null
+lsof -ti tcp:30141 | xargs kill -TERM 2>/dev/null   # 必须：否则旧 next-server 继续服务旧 chunk
 rm -rf /Applications/Pi.app
 ditto /path/to/pi-web/dist/macos/Pi.app /Applications/Pi.app
+xattr -cr /Applications/Pi.app
 open /Applications/Pi.app
 ```
+
+仅 `ditto` 覆盖 App **不会**更新已在跑的 30141 进程；详见 `AGENTS.md` → **Packaging / 30141**。
+
+本机浏览器 30141（非 App）在打包前还需：`npm run build && npm start`（读 `.next`，不是 `.next-package`）。
 
 若提示已损坏或无法打开：`xattr -cr /Applications/Pi.app` 后再试。
 

@@ -16,7 +16,19 @@ if [[ ! -f "$ROOT/package-lock.json" ]]; then
   exit 1
 fi
 
+SWIFT_SRC="$ROOT/macos/PiWorkbench/Sources"
+needs_swift_build=0
 if [[ ! -x "$SWIFT_BUILD" ]]; then
+  needs_swift_build=1
+else
+  while IFS= read -r -d '' src; do
+    if [[ "$src" -nt "$SWIFT_BUILD" ]]; then
+      needs_swift_build=1
+      break
+    fi
+  done < <(find "$SWIFT_SRC" -type f \( -name '*.swift' -o -name '*.plist' \) -print0)
+fi
+if [[ "$needs_swift_build" == "1" ]]; then
   echo "building PiWorkbench release binary..."
   (cd "$ROOT/macos/PiWorkbench" && swift build -c release)
 fi
