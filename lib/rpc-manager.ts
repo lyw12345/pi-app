@@ -2,7 +2,6 @@ import { createAgentSession, DEFAULT_COMPACTION_SETTINGS, findCutPoint, SessionM
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getAgentDir } from "@/lib/agent-dir";
-import { defaultAutoCompactionEnabled, defaultAutoRetryEnabled } from "@/lib/pi-web-preferences";
 import { cacheSessionPath } from "./session-reader";
 import { lookupModel } from "./resolve-model";
 import { collectSlashCommands, type SlashCommandListSource } from "./slash-commands";
@@ -376,8 +375,8 @@ export async function startRpcSession(
       inner.agent.state.systemPrompt = "";
     }
 
-    inner.setAutoCompactionEnabled(defaultAutoCompactionEnabled());
-    inner.setAutoRetryEnabled(defaultAutoRetryEnabled());
+    inner.setAutoCompactionEnabled(true);
+    inner.setAutoRetryEnabled(true);
 
     const wrapper = new AgentSessionWrapper(inner);
     wrapper.start();

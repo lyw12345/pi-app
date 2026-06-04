@@ -13,7 +13,6 @@ interface Props {
   startingChat?: boolean;
   startChatError?: string | null;
   sessionRestoreNotice?: string | null;
-  onEnterAdvancedMode?: () => void;
 }
 
 interface HistoryResponse {
@@ -37,7 +36,6 @@ export function WorkbenchHome({
   startingChat,
   startChatError,
   sessionRestoreNotice,
-  onEnterAdvancedMode,
 }: Props) {
   const { t, locale } = useI18n();
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -162,17 +160,6 @@ export function WorkbenchHome({
             ))}
           </div>
         </section>
-        {onEnterAdvancedMode && (
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={onEnterAdvancedMode}
-              className="text-[12px] text-text-dim underline hover:text-text-muted"
-            >
-              {t("settings.advancedMode")}
-            </button>
-          </div>
-        )}
       </div>
       {detailItem ? (
         <WorkbenchHistoryDetail

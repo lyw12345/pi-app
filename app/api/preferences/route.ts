@@ -26,17 +26,8 @@ function sanitizePatch(body: unknown): Partial<PiWebPreferences> {
   if (typeof input.notificationsEnabled === "boolean") {
     patch.notificationsEnabled = input.notificationsEnabled;
   }
-  if (typeof input.autoCompactionEnabled === "boolean") {
-    patch.autoCompactionEnabled = input.autoCompactionEnabled;
-  }
-  if (typeof input.autoRetryEnabled === "boolean") {
-    patch.autoRetryEnabled = input.autoRetryEnabled;
-  }
   if (typeof input.branchSummarizeBeforeSwitch === "boolean") {
     patch.branchSummarizeBeforeSwitch = input.branchSummarizeBeforeSwitch;
-  }
-  if (typeof input.showSlashCommands === "boolean") {
-    patch.showSlashCommands = input.showSlashCommands;
   }
 
   return patch;

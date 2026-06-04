@@ -13,9 +13,9 @@
 
 ## 里程碑验收（v2.1.0，须全部通过 — M4-01～03）
 
-- [ ] **高级模式 / 设置**内可浏览已安装扩展（路径、启用状态、错误信息）；**不提供**在线编写 TS
-- [ ] 场景配置可 **导出 / 导入 JSON 包**（含 override 字段）；导入前预览 diff，冲突可取消
-- [ ] 至少一种 **只读分享**可用：会话 HTML 导出（已有）+ **分享链接向导**（静态文件或只读远程二选一，见 M4-03 spike）
+- [x] **高级模式 / 设置**内可浏览已安装扩展（路径、启用状态、错误信息）；**不提供**在线编写 TS
+- [x] 场景配置可 **导出 / 导入 JSON 包**（含 override 字段）；导入前预览 diff，冲突可取消
+- [x] 至少一种 **只读分享**可用：会话 HTML 导出（已有）+ **分享链接向导**（静态文件或只读 remote 二选一，见 M4-03 spike）
 - [ ] 默认用户路径不变：简洁工具、远程默认关、`auth.json` 与 CLI 共用、无第二套 OAuth
 
 > **不在 v2.1.0 里程碑内**：团队 Git 同步、中心服务端、扩展在线 IDE、Gist `/share`、Bash 面板 — 见 v2.2+ / backlog。
@@ -83,7 +83,7 @@
 | **主要文件** | 新 `app/api/extensions/route.ts`、`components/ExtensionsSettings.tsx`、`lib/extensions-reader.ts`（或复用 pi 包 API 若 SP-01 通过） |
 | **依赖** | SP-01；M3-01 命令白名单策略与扩展命令列表对齐 |
 | **体量** | M |
-| **完成** | [ ] |
+| **完成** | [x] |
 
 ---
 
@@ -99,7 +99,7 @@
 | **主要文件** | `lib/scene-overrides.ts`、`app/api/scene-overrides/*`、`components/SceneConfigEditor.tsx` 或 Settings |
 | **依赖** | SP-03 |
 | **体量** | M |
-| **完成** | [ ] |
+| **完成** | [x] |
 
 ---
 
@@ -115,7 +115,7 @@
 | **主要文件** | `ChatWindow` 或菜单、`lib/remote-auth.ts`、`RemoteAccessSettings.tsx`、export route |
 | **依赖** | SP-02；M3-05 export 已闭合 |
 | **体量** | S～M（视 SP-02 分支） |
-| **完成** | [ ] |
+| **完成** | [x] |
 
 ---
 
@@ -190,7 +190,7 @@ SP-01 / SP-02 / SP-03（并行，1 周）
 ## 交付物
 
 - [x] [m4-design.md](./m4-design.md)（扩展 / 分享 / 场景包各 1 节，SP 完成后写）
-- [ ] `scripts/m4-preflight.mjs` + `npm run test:m4`
+- [x] `scripts/m4-preflight.mjs` + `npm run test:m4`
 - [ ] v2.1.0 发布说明（按实际立项子集）
 
 ---
@@ -213,4 +213,4 @@ SP-01 / SP-02 / SP-03（并行，1 周）
 | 2026-06-03 | 清单创建，M4 为方向性 backlog |
 | 2026-06-03 | 对齐 [product-principles.md](./product-principles.md) |
 | 2026-06-04 | 按 M3 范式细化：v2.1.0 = M4-01～03 + Pre-flight；团队同步 / 多 Tab 延后 |
-| 2026-06-04 | **立项完成**：SP-01～03 结论写入 m4-design.md；场景包样例 fixtures/m4-scene-pack-v1.example.json |
+| 2026-06-04 | **M4-01～03 实现**：扩展列表、场景包 import/export、分享向导、test:m4 |

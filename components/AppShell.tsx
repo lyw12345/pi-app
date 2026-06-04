@@ -39,14 +39,12 @@ export function AppShell() {
   const [modelsConfigOpen, setModelsConfigOpen] = useState(false);
   const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
   const [workbenchView, setWorkbenchView] = useState<"home" | "settings" | "chat">("home");
   const [preferredCwd, setPreferredCwd] = useState<string | null>(null);
-  const [toolMode, setToolMode] = useState<ToolMode>("simple");
-  const [advancedMode, setAdvancedMode] = useState(false);
-  const [showSlashCommands, setShowSlashCommands] = useState(false);
+  const [toolMode, setToolMode] = useState<ToolMode>("full");
   const [startingChat, setStartingChat] = useState(false);
   const [startChatError, setStartChatError] = useState<string | null>(null);
   const [sessionRestoreNotice, setSessionRestoreNotice] = useState<string | null>(null);
@@ -107,12 +105,6 @@ export function AppShell() {
   }, [activeTopPanel]);
 
   useEffect(() => {
-    if (!advancedMode) {
-      setActiveTopPanel((cur) => (cur === "system" ? null : cur));
-    }
-  }, [advancedMode]);
-
-  useEffect(() => {
     const onResize = () => {
       if (window.innerWidth <= 640) setSidebarOpen(false);
     };
@@ -147,7 +139,7 @@ export function AppShell() {
   useEffect(() => {
     void fetch("/api/preferences")
       .then((res) => res.json())
-      .then((data: { preferences?: { defaultWorkspaceCwd?: string; toolMode?: ToolMode; showSlashCommands?: boolean } }) => {
+      .then((data: { preferences?: { defaultWorkspaceCwd?: string; toolMode?: ToolMode } }) => {
         if (data.preferences) {
           cachePiWebPreferences(data.preferences);
         }
@@ -157,9 +149,6 @@ export function AppShell() {
         }
         if (data.preferences?.toolMode) {
           setToolMode(data.preferences.toolMode);
-        }
-        if (data.preferences?.showSlashCommands) {
-          setShowSlashCommands(true);
         }
       })
       .catch(() => {});
@@ -355,25 +344,6 @@ export function AppShell() {
   const handleOpenModelsConfig = useCallback(() => {
     setModelsConfigOpen(true);
   }, []);
-
-  const handleAdvancedModeChange = useCallback((enabled: boolean) => {
-    setAdvancedMode(enabled);
-    if (enabled) {
-      setSidebarOpen(true);
-      setToolMode("full");
-    } else {
-      setToolMode("simple");
-    }
-    void fetch("/api/preferences", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ toolMode: enabled ? "full" : "simple" }),
-    });
-  }, []);
-
-  const handleEnterAdvancedMode = useCallback(() => {
-    handleAdvancedModeChange(true);
-  }, [handleAdvancedModeChange]);
 
   const handleOpenHistoryItem = useCallback((item: ProductHistoryItem) => {
     setNewSessionCwd(null);
@@ -580,7 +550,7 @@ export function AppShell() {
               {i18nT("appShell.home")}
             </button>
           </div>
-          {showChat && (showBranchNavigator || advancedMode) && (
+          {showChat && (
             <div className="chat-branch-tools" style={{ display: "flex", alignItems: "stretch", height: "100%" }}>
               {showBranchNavigator ? (
                 <BranchNavigator
@@ -596,7 +566,6 @@ export function AppShell() {
                   hasSession
                 />
               ) : null}
-              {advancedMode ? (
               <button
                 ref={systemBtnRef}
                 onClick={() => toggleTopPanel("system")}
@@ -625,7 +594,6 @@ export function AppShell() {
                   <polyline points="2 3.5 5 6.5 8 3.5" />
                 </svg>
               </button>
-              ) : null}
             </div>
           )}
           {showChat && (
@@ -644,7 +612,7 @@ export function AppShell() {
               width: topPanelPos.width,
               zIndex: 500,
             }}>
-              {activeTopPanel === "system" && advancedMode && (
+              {activeTopPanel === "system" && (
                 <div style={{
                   background: "var(--bg-popover)",
                   borderTop: "1px solid var(--border)",
@@ -698,20 +666,15 @@ export function AppShell() {
               onSessionStatsChange={handleSessionStatsChange}
               onContextUsageChange={handleContextUsageChange}
               toolMode={toolMode}
-              advancedMode={advancedMode}
-              showSlashCommands={showSlashCommands}
               onOpenModels={handleOpenModelsConfig}
+              onOpenSettings={handleOpenSettingsView}
             />
           ) : showPlaceholder ? (
             workbenchView === "settings" ? (
               <WorkbenchSettings
                 onOpenModels={handleOpenModelsConfig}
                 onOpenSkills={() => setSkillsConfigOpen(true)}
-                onAdvancedModeChange={handleAdvancedModeChange}
-                advancedMode={advancedMode}
                 skillsDisabled={settingsSkillsDisabled}
-                showSlashCommands={showSlashCommands}
-                onShowSlashCommandsChange={setShowSlashCommands}
               />
             ) : (
               <WorkbenchHome
@@ -720,7 +683,6 @@ export function AppShell() {
                 startingChat={startingChat}
                 startChatError={startChatError}
                 sessionRestoreNotice={sessionRestoreNotice}
-                onEnterAdvancedMode={handleEnterAdvancedMode}
               />
             )
           ) : restoringInitialSession ? (

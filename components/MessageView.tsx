@@ -8,6 +8,7 @@ import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
 import { useI18n } from "@/lib/i18n/provider";
+import { displayUserMessageContent } from "@/lib/user-message-display";
 import type {
   AgentMessage,
   UserMessage,
@@ -139,13 +140,7 @@ function UserMessageView({ message, entryId, onFork, forking, onNavigate, prevAs
   const [hovered, setHovered] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const content =
-    typeof message.content === "string"
-      ? message.content
-      : message.content
-          .filter((b): b is TextContent => b.type === "text")
-          .map((b) => b.text)
-          .join("\n");
+  const content = displayUserMessageContent(message.content);
 
   const imageBlocks: ImageContent[] =
     typeof message.content === "string"

@@ -8,12 +8,8 @@ export interface PiWebPreferences {
   defaultWorkspaceCwd?: string;
   toolMode?: ToolMode;
   notificationsEnabled?: boolean;
-  autoCompactionEnabled?: boolean;
-  autoRetryEnabled?: boolean;
   /** When true, in-session branch switches call navigate_tree with summarize (default off). */
   branchSummarizeBeforeSwitch?: boolean;
-  /** When true with advanced mode, ChatInput shows / command completion (default off). */
-  showSlashCommands?: boolean;
 }
 
 export const PI_WEB_PREFERENCES_FILENAME = "pi-web-preferences.json";
@@ -48,15 +44,5 @@ export function mergePiWebPreferences(patch: Partial<PiWebPreferences>): PiWebPr
 }
 
 export function defaultToolMode(): ToolMode {
-  return loadPiWebPreferences().toolMode ?? "simple";
-}
-
-export function defaultAutoCompactionEnabled(): boolean {
-  const prefs = loadPiWebPreferences();
-  return prefs.autoCompactionEnabled !== false;
-}
-
-export function defaultAutoRetryEnabled(): boolean {
-  const prefs = loadPiWebPreferences();
-  return prefs.autoRetryEnabled !== false;
+  return loadPiWebPreferences().toolMode ?? "full";
 }

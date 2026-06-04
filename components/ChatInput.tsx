@@ -5,6 +5,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import type { TranslationKey } from "@/lib/i18n";
 import type { ToolMode } from "@/lib/pi-web-preferences";
 import { downloadHtmlBlob, fetchSessionHtmlExport } from "@/lib/download-export-html";
+import { ShareConversationModal } from "./ShareConversationModal";
 import {
   filterSlashCommands,
   getSlashCompletionAtCursor,
@@ -59,11 +60,11 @@ interface Props {
   onSoundToggle?: () => void;
   onClone?: () => void;
   cloning?: boolean;
-  sessionCwd?: string | null;
   sessionId?: string | null;
   slashCommandsEnabled?: boolean;
   slashCommands?: SlashCommandEntry[];
   onSlashCommand?: (message: string) => void;
+  onOpenSettings?: () => void;
 }
 
 export interface ChatInputHandle {
@@ -83,11 +84,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   retryInfo,
   soundEnabled, onSoundToggle,
   onClone, cloning = false,
-  sessionCwd = null,
   sessionId = null,
   slashCommandsEnabled = false,
   slashCommands = [],
   onSlashCommand,
+  onOpenSettings,
 }: Props, ref) {
   const { t } = useI18n();
   const compactErrorLabel = displayCompactError(compactError ?? null, t);
@@ -99,14 +100,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [cursorPos, setCursorPos] = useState(0);
   const [slashHighlight, setSlashHighlight] = useState(0);
-  const [skillsOpen, setSkillsOpen] = useState(false);
-  const [skills, setSkills] = useState<Array<{ name: string; description?: string }>>([]);
-  const [skillsLoading, setSkillsLoading] = useState(false);
   const [exportingHtml, setExportingHtml] = useState(false);
   const [exportHtmlError, setExportHtmlError] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const skillsDropdownRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const modelDropdownPanelRef = useRef<HTMLDivElement>(null);
   const toolDropdownRef = useRef<HTMLDivElement>(null);
@@ -293,18 +291,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     ],
   );
 
-  useEffect(() => {
-    if (!skillsOpen || !sessionCwd) return;
-    setSkillsLoading(true);
-    void fetch(`/api/skills?cwd=${encodeURIComponent(sessionCwd)}`)
-      .then((res) => res.json())
-      .then((data: { skills?: Array<{ name: string; description?: string }> }) => {
-        setSkills(data.skills ?? []);
-      })
-      .catch(() => setSkills([]))
-      .finally(() => setSkillsLoading(false));
-  }, [skillsOpen, sessionCwd]);
-
   const handleExportHtml = useCallback(async () => {
     if (!sessionId || exportingHtml) return;
     if (isStreaming) {
@@ -379,9 +365,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       }
       if (thinkingDropdownRef.current && !thinkingDropdownRef.current.contains(e.target as Node)) {
         setThinkingDropdownOpen(false);
-      }
-      if (skillsDropdownRef.current && !skillsDropdownRef.current.contains(e.target as Node)) {
-        setSkillsOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -492,9 +475,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 style={{
                   display: "flex",
                   width: "100%",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  gap: 2,
+                  alignItems: "center",
                   padding: "8px 12px",
                   background: index === slashHighlight ? "var(--bg-selected)" : "none",
                   border: "none",
@@ -505,9 +486,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 }}
               >
                 <span style={{ fontFamily: "var(--font-mono)" }}>/{cmd.name}</span>
-                {cmd.description ? (
-                  <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{cmd.description}</span>
-                ) : null}
               </button>
             ))}
           </div>
@@ -967,73 +945,22 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               </div>
             )}
 
-            {sessionCwd && !isStreaming && (
-              <div ref={skillsDropdownRef} style={{ position: "relative" }}>
-                <button
-                  type="button"
-                  onClick={() => setSkillsOpen((v) => !v)}
-                  title={t("chatInput.insertSkill")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    padding: "8px 12px", height: 32,
-                    background: skillsOpen ? "var(--bg-hover)" : "none",
-                    border: "none", borderRadius: 9,
-                    color: "var(--text-muted)",
-                    cursor: "pointer", fontSize: 12,
-                  }}
-                >
-                  {t("chatInput.insertSkill")}
-                </button>
-                {skillsOpen && (
-                  <div style={{
-                    position: "absolute", bottom: "calc(100% + 6px)", right: 0,
-                    zIndex: 100, background: "var(--bg)", border: "1px solid var(--border)",
-                    borderRadius: 8, boxShadow: "0 -4px 16px rgba(0,0,0,0.10)",
-                    minWidth: 200, maxHeight: 240, overflowY: "auto",
-                  }}>
-                    {skillsLoading && (
-                      <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-dim)" }}>{t("common.loading")}</div>
-                    )}
-                    {!skillsLoading && skills.length === 0 && (
-                      <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-dim)" }}>{t("chatInput.insertSkillEmpty")}</div>
-                    )}
-                    {skills.map((skill) => (
-                      <button
-                        key={skill.name}
-                        type="button"
-                        onClick={() => {
-                          setSkillsOpen(false);
-                          const ref = textareaRef.current;
-                          const insert = `/skill:${skill.name}`;
-                          if (ref) {
-                            const start = ref.selectionStart ?? ref.value.length;
-                            const end = ref.selectionEnd ?? ref.value.length;
-                            const before = ref.value.slice(0, start);
-                            const after = ref.value.slice(end);
-                            const sep = before.length > 0 && !before.endsWith(" ") ? " " : "";
-                            const newVal = before + sep + insert + after;
-                            setValue(newVal);
-                            requestAnimationFrame(() => {
-                              const pos = start + sep.length + insert.length;
-                              ref.setSelectionRange(pos, pos);
-                              ref.focus();
-                            });
-                          } else {
-                            setValue((v) => v + (v ? " " : "") + insert);
-                          }
-                        }}
-                        style={{
-                          display: "block", width: "100%", padding: "7px 12px",
-                          background: "none", border: "none", textAlign: "left",
-                          color: "var(--text)", cursor: "pointer", fontSize: 12,
-                        }}
-                      >
-                        <span style={{ fontFamily: "var(--font-mono)" }}>{skill.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {sessionId && !isStreaming && (
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                title={t("shareConversation.title")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "8px 12px", height: 32,
+                  background: "none", border: "none", borderRadius: 9,
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  fontSize: 12, whiteSpace: "nowrap",
+                }}
+              >
+                {t("shareConversation.button")}
+              </button>
             )}
 
             {sessionId && !isStreaming && (
@@ -1211,6 +1138,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
 
         </div>
       </div>
+      {shareOpen && sessionId ? (
+        <ShareConversationModal
+          sessionId={sessionId}
+          isStreaming={isStreaming}
+          onClose={() => setShareOpen(false)}
+        />
+      ) : null}
     </div>
   );
 });

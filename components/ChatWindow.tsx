@@ -29,9 +29,8 @@ interface Props {
   onSessionStatsChange?: (stats: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost?: number } | null) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   toolMode?: ToolMode;
-  advancedMode?: boolean;
-  showSlashCommands?: boolean;
   onOpenModels?: () => void;
+  onOpenSettings?: () => void;
 }
 
 function phaseLabel(phase: AgentPhase): string {
@@ -101,7 +100,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onBranchNavigatingChange, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, toolMode = "simple", advancedMode = false, showSlashCommands = false, onOpenModels }: Props) {
+export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onBranchNavigatingChange, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, toolMode = "full", onOpenModels, onOpenSettings }: Props) {
   const { t } = useI18n();
   const {
     loading, error, messages, entryIds, streamState,
@@ -229,9 +228,8 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   lastResultSummaryRef.current = lastResultSummary;
 
   const [slashCommands, setSlashCommands] = useState<SlashCommandEntry[]>([]);
-  const slashCommandsEnabled = advancedMode && showSlashCommands;
+  const slashCommandsEnabled = true;
   const activeSessionId = session?.id ?? sessionIdRef.current ?? null;
-  const activeSessionCwd = session?.cwd ?? newSessionCwd ?? null;
 
   useEffect(() => {
     if (!activeSessionId || !slashCommandsEnabled) {
@@ -276,7 +274,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       toolPreset={toolPreset}
       onToolPresetChange={session || isNew ? handleToolPresetChange : undefined}
       toolMode={toolMode}
-      showAdvancedTools={advancedMode || toolMode !== "simple"}
+      showAdvancedTools
       thinkingLevel={thinkingLevel}
       onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
       availableThinkingLevels={availableThinkingLevels}
@@ -287,10 +285,10 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       onClone={session && !isNew ? handleClone : undefined}
       cloning={cloning}
       sessionId={activeSessionId}
-      sessionCwd={activeSessionCwd}
       slashCommandsEnabled={slashCommandsEnabled && !isNew}
       slashCommands={slashCommands}
       onSlashCommand={slashCommandsEnabled ? handleSend : undefined}
+      onOpenSettings={onOpenSettings}
     />
   );
 

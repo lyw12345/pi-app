@@ -27,6 +27,7 @@
     "test:workbench": "node scripts/workbench-smoke.mjs",
     "test:m2": "node scripts/m2-preflight.mjs",
     "test:m3": "node scripts/m3-preflight.mjs",
+    "test:m4": "node scripts/m4-preflight.mjs",
     "package:macos": "bash scripts/package-macos-app.sh",
     "tunnel:cloudflare": "bash scripts/tunnel-cloudflared.sh",
     "relay:server": "node --experimental-strip-types scripts/pi-relay-server.ts",

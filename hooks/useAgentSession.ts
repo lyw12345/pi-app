@@ -93,7 +93,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked,
     modelsRefreshKey, onBranchDataChange, onBranchNavigatingChange, onSystemPromptChange,
-    toolMode = "simple",
+    toolMode = "full",
   } = opts;
 
   const isNew = session === null && newSessionCwd !== null;

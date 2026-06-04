@@ -35,18 +35,6 @@ assert.equal(health.ok, true);
 assert.ok(health.version, "pi-web version");
 assert.ok(health.piVersion, "pi-coding-agent version");
 
-const prefPut = await getJson("/api/preferences", {
-  method: "PUT",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ showSlashCommands: true }),
-});
-assert.equal(prefPut.preferences?.showSlashCommands, true);
-await getJson("/api/preferences", {
-  method: "PUT",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ showSlashCommands: false }),
-});
-
 const usage = await getJson("/api/usage?days=7");
 assert.ok(usage.usage, "usage summary");
 assert.ok(usage.timeline?.days, "usage timeline");
