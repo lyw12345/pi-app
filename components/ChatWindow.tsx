@@ -217,6 +217,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   const currentThinkingLevelMap = displayModelValue
     ? (modelThinkingLevelMaps[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
     : null;
+  const currentCwd = session?.cwd ?? newSessionCwd ?? undefined;
 
   const latestAssistantText = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -466,6 +467,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
                     prevAssistantEntryId={agentRunning ? undefined : prevAssistantEntryId}
                     onEditContent={(content) => chatInputRef?.current?.insertIfEmpty(content)}
                     onOpenFile={onOpenFile}
+                    cwd={currentCwd}
                     showTimestamp={showTimestamp}
                     prevTimestamp={idx > 0 ? (messages[idx - 1] as AgentMessage & { timestamp?: number }).timestamp : undefined}
                   />
@@ -483,7 +485,13 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
             })()}
 
             {streamState.isStreaming && streamState.streamingMessage && (
-              <MessageView message={streamState.streamingMessage as AgentMessage} isStreaming modelNames={modelNames} />
+              <MessageView
+                message={streamState.streamingMessage as AgentMessage}
+                isStreaming
+                modelNames={modelNames}
+                onOpenFile={onOpenFile}
+                cwd={currentCwd}
+              />
             )}
 
             {agentRunning && !streamState.streamingMessage && (

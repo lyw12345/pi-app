@@ -9,6 +9,7 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useTheme } from "@/hooks/useTheme";
 import { useI18n } from "@/lib/i18n/provider";
 import { displayUserMessageContent, displayUserMessageFilePaths } from "@/lib/user-message-display";
+import { assistantOutputDisplayText, extractAssistantOutputFileRefs } from "@/lib/assistant-output-files";
 import { FileAttachmentChip } from "./FileAttachmentChip";
 import type {
   AgentMessage,
@@ -35,6 +36,7 @@ interface Props {
   prevAssistantEntryId?: string;
   onEditContent?: (content: string) => void;
   onOpenFile?: (filePath: string, fileName: string) => void;
+  cwd?: string;
   showTimestamp?: boolean;
   prevTimestamp?: number;
 }
@@ -71,7 +73,7 @@ function copyText(text: string): Promise<void> {
   }
 }
 
-export function MessageView({ message, isStreaming, toolResults, modelNames, entryId, onFork, forking, onNavigate, prevAssistantEntryId, onEditContent, onOpenFile, showTimestamp, prevTimestamp }: Props) {
+export function MessageView({ message, isStreaming, toolResults, modelNames, entryId, onFork, forking, onNavigate, prevAssistantEntryId, onEditContent, onOpenFile, cwd, showTimestamp, prevTimestamp }: Props) {
   if (message.role === "timelineSummary") {
     return <TimelineSummaryView message={message as TimelineSummaryMessage} />;
   }
@@ -79,7 +81,7 @@ export function MessageView({ message, isStreaming, toolResults, modelNames, ent
     return <UserMessageView message={message as UserMessage} entryId={entryId} onFork={onFork} forking={forking} onNavigate={onNavigate} prevAssistantEntryId={prevAssistantEntryId} onEditContent={onEditContent} onOpenFile={onOpenFile} />;
   }
   if (message.role === "assistant") {
-    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} />;
+    return <AssistantMessageView message={message as AssistantMessage} isStreaming={isStreaming} toolResults={toolResults} modelNames={modelNames} onOpenFile={onOpenFile} cwd={cwd} showTimestamp={showTimestamp} prevTimestamp={prevTimestamp} />;
   }
   if (message.role === "toolResult") {
     // Rendered inline under its toolCall — skip standalone rendering if paired
@@ -344,6 +346,8 @@ function AssistantMessageView({
   isStreaming,
   toolResults,
   modelNames,
+  onOpenFile,
+  cwd,
   showTimestamp,
   prevTimestamp,
 }: {
@@ -351,6 +355,8 @@ function AssistantMessageView({
   isStreaming?: boolean;
   toolResults?: Map<string, ToolResultMessage>;
   modelNames?: Record<string, string>;
+  onOpenFile?: (filePath: string, fileName: string) => void;
+  cwd?: string;
   showTimestamp?: boolean;
   prevTimestamp?: number;
 }) {
@@ -513,7 +519,7 @@ function AssistantMessageView({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {blocks.map((block, i) => (
-          <BlockView key={i} block={block} toolResults={toolResults} streamingDuration={streamingDurations.get(i) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} isStreaming={isStreaming} />
+          <BlockView key={i} block={block} toolResults={toolResults} streamingDuration={streamingDurations.get(i) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} isStreaming={isStreaming} onOpenFile={onOpenFile} cwd={cwd} />
         ))}
       </div>
 
@@ -566,9 +572,9 @@ function AssistantMessageView({
   );
 }
 
-function BlockView({ block, toolResults, streamingDuration, toolCallDurations, isStreaming }: { block: AssistantContentBlock; toolResults?: Map<string, ToolResultMessage>; streamingDuration?: number; toolCallDurations?: Map<string, number>; isStreaming?: boolean }) {
+function BlockView({ block, toolResults, streamingDuration, toolCallDurations, isStreaming, onOpenFile, cwd }: { block: AssistantContentBlock; toolResults?: Map<string, ToolResultMessage>; streamingDuration?: number; toolCallDurations?: Map<string, number>; isStreaming?: boolean; onOpenFile?: (filePath: string, fileName: string) => void; cwd?: string }) {
   if (block.type === "text") {
-    return <TextBlock block={block as TextContent} isStreaming={isStreaming} />;
+    return <TextBlock block={block as TextContent} isStreaming={isStreaming} onOpenFile={onOpenFile} cwd={cwd} />;
   }
   if (block.type === "thinking") {
     return <ThinkingBlock block={block as ThinkingContent} duration={streamingDuration} />;
@@ -582,9 +588,23 @@ function BlockView({ block, toolResults, streamingDuration, toolCallDurations, i
   return null;
 }
 
-function TextBlock({ block, isStreaming }: { block: TextContent; isStreaming?: boolean }) {
+function TextBlock({ block, isStreaming, onOpenFile, cwd }: { block: TextContent; isStreaming?: boolean; onOpenFile?: (filePath: string, fileName: string) => void; cwd?: string }) {
+  const fileRefs = useMemo(() => extractAssistantOutputFileRefs(block.text, cwd), [block.text, cwd]);
+  const displayText = useMemo(() => assistantOutputDisplayText(block.text, cwd), [block.text, cwd]);
   return (
     <div className="markdown-body">
+      {fileRefs.length > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: displayText ? 8 : 0 }}>
+          {fileRefs.map((ref) => (
+            <FileAttachmentChip
+              key={ref.path}
+              name={ref.label}
+              path={ref.path}
+              onOpen={onOpenFile ? () => onOpenFile(ref.path, ref.label) : undefined}
+            />
+          ))}
+        </div>
+      )}
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -619,7 +639,7 @@ function TextBlock({ block, isStreaming }: { block: TextContent; isStreaming?: b
           },
         }}
       >
-        {block.text}
+        {displayText}
       </ReactMarkdown>
     </div>
   );
