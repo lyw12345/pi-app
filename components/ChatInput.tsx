@@ -83,6 +83,7 @@ export interface ChatInputHandle {
 
 const TOOL_PRESETS = ["off", "default", "full"] as const;
 const TOOL_PRESET_MAP: Record<"off" | "default" | "full", "none" | "default" | "full"> = { off: "none", default: "default", full: "full" };
+const COMPOSITION_END_ENTER_GRACE_MS = 100;
 
 const THINKING_LEVELS = ["auto", "off", "minimal", "low", "medium", "high", "xhigh"] as const;
 export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
@@ -120,6 +121,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const toolDropdownRef = useRef<HTMLDivElement>(null);
   const thinkingDropdownRef = useRef<HTMLDivElement>(null);
   const generalFileInputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
+  const lastCompositionEndAtRef = useRef(0);
 
   useImperativeHandle(ref, () => ({
     insertIfEmpty(text: string) {
@@ -329,6 +332,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      const nativeEvent = e.nativeEvent;
+      const recentlyComposed = Date.now() - lastCompositionEndAtRef.current < COMPOSITION_END_ENTER_GRACE_MS;
+      const isComposing =
+        isComposingRef.current ||
+        nativeEvent.isComposing ||
+        nativeEvent.keyCode === 229;
+
       if (slashMenuOpen) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
@@ -340,7 +350,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           setSlashHighlight((i) => (i - 1 + filteredSlashCommands.length) % filteredSlashCommands.length);
           return;
         }
-        if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey && !e.nativeEvent.isComposing) {
+        if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey && !isComposing && !recentlyComposed) {
           e.preventDefault();
           const picked = filteredSlashCommands[slashHighlight];
           if (picked) applySlashCommand(picked.name);
@@ -351,7 +361,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           return;
         }
       }
-      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+
+      if (e.key === "Enter" && !e.shiftKey && (isComposing || recentlyComposed)) {
+        if (recentlyComposed) e.preventDefault();
+        return;
+      }
+
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (steerMode && (onSteer || onFollowUp)) {
           sendQueued(onSteer ? "steer" : "followup");
@@ -631,6 +647,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             onKeyUp={syncCursor}
             onClick={syncCursor}
             onSelect={syncCursor}
+            onCompositionStart={() => {
+              isComposingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              isComposingRef.current = false;
+              lastCompositionEndAtRef.current = Date.now();
+            }}
             onInput={handleInput}
             onPaste={handlePaste}
             placeholder={

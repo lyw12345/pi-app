@@ -32,6 +32,34 @@ interface FileData {
   size: number;
 }
 
+const DOCX_PREVIEW_MAX_BYTES = 10 * 1024 * 1024;
+
+function getFileExt(filePath: string): string {
+  return getFileName(filePath).toLowerCase().split(".").pop() ?? "";
+}
+
+function DownloadLink({ filePath, label = "Download" }: { filePath: string; label?: string }) {
+  const encoded = encodeFilePathForApi(filePath);
+  return (
+    <a
+      href={`/api/files/${encoded}?type=read`}
+      download={getFileName(filePath)}
+      style={{
+        color: "var(--text-muted)",
+        textDecoration: "none",
+        border: "1px solid var(--border)",
+        borderRadius: 5,
+        padding: "2px 8px",
+        fontSize: 11,
+        lineHeight: 1.4,
+        background: "var(--bg-hover)",
+        flexShrink: 0,
+      }}
+    >
+      {label}
+    </a>
+  );
+}
 type DiffLine =
   | { type: "unchanged"; text: string; lineNo: number }
   | { type: "removed"; text: string; lineNo: number }
@@ -571,7 +599,129 @@ function SystemFileFallbackViewer({ filePath, cwd, displayLabel }: { filePath: s
   );
 }
 
+function DocumentViewer({ filePath, cwd, displayLabel }: { filePath: string; cwd?: string; displayLabel?: string }) {
+  const [watching, setWatching] = useState(false);
+  const [bust, setBust] = useState(0);
+  const [size, setSize] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const esRef = useRef<EventSource | null>(null);
+
+  const ext = getFileExt(displayLabel?.trim() || filePath);
+  const encoded = encodeFilePathForApi(filePath);
+  const previewUrl = `/api/files/${encoded}?type=preview${bust ? `&v=${bust}` : ""}`;
+  const title = displayLabel?.trim() || displayNameFromFilePath(filePath) || getRelativeFilePath(filePath, cwd);
+
+  useEffect(() => {
+    setBust(0);
+    setSize(null);
+    setError(null);
+    setWatching(false);
+
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
+    }
+
+    fetch(`/api/files/${encoded}?type=meta`)
+      .then((r) => r.json())
+      .then((d: { size?: number; error?: string }) => {
+        if (d.error) setError(d.error);
+        if (typeof d.size === "number") {
+          setSize(d.size);
+          if (d.size > DOCX_PREVIEW_MAX_BYTES) {
+            setError("DOCX too large for preview (>10MB)");
+          }
+        }
+      })
+      .catch((e) => setError(String(e)));
+
+    const es = new EventSource(`/api/files/${encoded}?type=watch`);
+    esRef.current = es;
+
+    es.addEventListener("connected", () => setWatching(true));
+    es.addEventListener("change", (e) => {
+      try {
+        const d = JSON.parse((e as MessageEvent).data) as { size?: number };
+        if (typeof d.size === "number") {
+          setSize(d.size);
+          if (d.size > DOCX_PREVIEW_MAX_BYTES) {
+            setError("DOCX too large for preview (>10MB)");
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+      setError(null);
+      setBust((b) => b + 1);
+    });
+    es.addEventListener("error", () => setWatching(false));
+    es.onerror = () => setWatching(false);
+
+    return () => {
+      es.close();
+      esRef.current = null;
+    };
+  }, [encoded]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      <FilePreviewHeader title={title} filePath={filePath} badge={ext || "docx"} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "4px 16px",
+          borderBottom: "1px solid var(--border)",
+          fontSize: 11,
+          color: "var(--text-dim)",
+          background: "var(--bg)",
+          flexShrink: 0,
+        }}
+      >
+        {size != null && <span>{formatSize(size)}</span>}
+        <DownloadLink filePath={filePath} />
+        <span
+          title={watching ? "Live sync active" : "Not watching"}
+          style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, color: watching ? "#4ade80" : "var(--text-dim)", flexShrink: 0 }}
+        >
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: watching ? "#4ade80" : "var(--border)",
+              display: "inline-block",
+              boxShadow: watching ? "0 0 4px #4ade80" : "none",
+            }}
+          />
+          {watching ? "live" : "static"}
+        </span>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, background: "var(--bg-panel)" }}>
+        {error ? (
+          <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, color: "#f87171", fontSize: 13, textAlign: "center" }}>
+            {error}
+          </div>
+        ) : (
+          <iframe
+            key={previewUrl}
+            src={previewUrl}
+            sandbox=""
+            title={`Preview ${title}`}
+            style={{ width: "100%", height: "100%", border: "none", background: "#eef1f5" }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function FileViewer({ filePath, cwd, displayLabel }: Props) {
+  const ext = getFileExt(displayLabel?.trim() || filePath);
+  if (ext === "docx") {
+    return <DocumentViewer filePath={filePath} cwd={cwd} displayLabel={displayLabel} />;
+  }
+
   const kind = resolveFilePreviewKind(filePath, displayLabel);
   switch (kind) {
     case "image":
@@ -586,7 +736,6 @@ export function FileViewer({ filePath, cwd, displayLabel }: Props) {
       return <TextFileViewer filePath={filePath} cwd={cwd} displayLabel={displayLabel} />;
   }
 }
-
 function TextFileViewer({ filePath, cwd, displayLabel }: Props) {
   const { isDark } = useTheme();
   const { t } = useI18n();
