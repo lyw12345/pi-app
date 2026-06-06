@@ -195,6 +195,7 @@ function PiAgentTitle() {
 export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSession, onOpenSettings, isSettingsView = false, initialSessionId, onInitialRestoreDone, refreshKey, onSessionDeleted, onSessionRenamed, pinnedSession, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onAtMention }: Props) {
   const { t } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
+  const [pickerProjectCwds, setPickerProjectCwds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCwd, setSelectedCwd] = useState<string | null>(null);
@@ -206,6 +207,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const [customPathValidating, setCustomPathValidating] = useState(false);
   const customPathInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownPanelRef = useRef<HTMLDivElement>(null);
+  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number; bottom: number } | null>(null);
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [explorerKey, setExplorerKey] = useState(0);
   const [sessionRefreshDone, setSessionRefreshDone] = useState(false);
@@ -222,8 +225,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       if (generation !== loadSessionsGenerationRef.current) return;
       if (res.status === 401) throw new Error("auth");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { sessions: SessionInfo[] };
+      const data = await res.json() as { sessions: SessionInfo[]; projectCwds?: string[] };
       setAllSessions(data.sessions);
+      if (Array.isArray(data.projectCwds)) {
+        setPickerProjectCwds(data.projectCwds);
+      }
       setError(null);
       if (!showLoading) {
         setSessionRefreshDone(true);
@@ -301,7 +307,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       }
 
       finishRestore(false);
-      const cwds = getProjectCwds(allSessions);
+      const cwds = pickerProjectCwds.length > 0 ? pickerProjectCwds : getProjectCwds(allSessions);
       if (cwds.length > 0) setSelectedCwd(cwds[0]);
       return;
     }
@@ -313,7 +319,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       return;
     }
     finishRestore(false);
-  }, [loading, allSessions, selectedCwd, selectedCwdProp, initialSessionId, onSelectSession, onInitialRestoreDone]);
+  }, [loading, allSessions, pickerProjectCwds, selectedCwd, selectedCwdProp, initialSessionId, onSelectSession, onInitialRestoreDone]);
 
   useEffect(() => {
     if (selectedCwd !== null) return;
@@ -381,17 +387,20 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
 
   // Close dropdown on outside click
   useEffect(() => {
+    if (!dropdownOpen) return;
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-        setCustomPathOpen(false);
-        setCustomPathValue("");
-        setCustomPathError(null);
+      const target = e.target as Node;
+      if (dropdownRef.current?.contains(target) || dropdownPanelRef.current?.contains(target)) {
+        return;
       }
+      setDropdownOpen(false);
+      setCustomPathOpen(false);
+      setCustomPathValue("");
+      setCustomPathError(null);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [dropdownOpen]);
 
   const handleNewSession = useCallback(() => {
     if (!filterCwd) return;
@@ -403,7 +412,17 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
     onNewSession?.(tempId, filterCwd);
   }, [filterCwd, onNewSession]);
 
-  const projectCwds = getProjectCwds(allSessions);
+  const projectCwds = useMemo(() => {
+    const seen = new Set(pickerProjectCwds);
+    const merged = [...pickerProjectCwds];
+    for (const cwd of getProjectCwds(allSessions)) {
+      if (!seen.has(cwd)) {
+        seen.add(cwd);
+        merged.push(cwd);
+      }
+    }
+    return merged;
+  }, [pickerProjectCwds, allSessions]);
   const filteredSessions = filterCwd
     ? allSessions.filter((s) => s.cwd === filterCwd)
     : allSessions;
@@ -514,7 +533,11 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
         {/* CWD picker */}
         <div ref={dropdownRef} style={{ position: "relative" }}>
           <button
-            onClick={() => setDropdownOpen((v) => !v)}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setDropdownRect({ top: rect.top, left: rect.left, width: rect.width, bottom: rect.bottom });
+              setDropdownOpen((v) => !v);
+            }}
             style={{
               width: "100%",
               display: "flex",
@@ -546,20 +569,24 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
             </span>
           </button>
 
-          {dropdownOpen && (
+          {dropdownOpen && dropdownRect && (() => {
+            const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+            const maxH = Math.max(120, Math.min(viewportHeight - dropdownRect.bottom - 12, 520));
+            return (
             <div
+              ref={dropdownPanelRef}
               style={{
-                position: "absolute",
-                top: "calc(100% + 4px)",
-                left: 0,
-                right: 0,
-                zIndex: 100,
+                position: "fixed",
+                top: dropdownRect.bottom + 4,
+                left: dropdownRect.left,
+                width: dropdownRect.width,
+                zIndex: 1000,
                 background: "var(--bg)",
                 border: "1px solid var(--border)",
                 borderRadius: 8,
                 boxShadow: "0 6px 20px rgba(0,0,0,0.10)",
                 overflow: "hidden",
-                maxHeight: "min(70vh, 520px)",
+                maxHeight: maxH,
                 overflowY: "auto",
               }}
             >
@@ -741,7 +768,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 

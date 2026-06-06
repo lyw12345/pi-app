@@ -1,14 +1,65 @@
+import { resolve } from "node:path";
 import { SessionManager, buildSessionContext as piBuildSessionContext } from "@earendil-works/pi-coding-agent";
-import { getAgentDir } from "@/lib/agent-dir";
+import { getAgentDir, getDefaultAgentDir } from "@/lib/agent-dir";
 import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage } from "./types";
 import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } from "@earendil-works/pi-coding-agent";
 import { normalizeAgentMessage } from "./normalize";
+import { loadPiWebPreferences } from "./pi-web-preferences";
 import { readProductSessionMetadataMap } from "./scene-metadata";
+import { getProjectCwds } from "./session-projects";
 
 export { getAgentDir };
 
 export function getSessionsDir(): string {
   return `${getAgentDir()}/sessions`;
+}
+
+async function listSessionsForAgentRoot(agentRoot: string): Promise<PiSessionInfo[]> {
+  const envKey = "PI_CODING_AGENT_DIR";
+  const prev = process.env[envKey];
+  process.env[envKey] = agentRoot;
+  try {
+    return await SessionManager.listAll();
+  } finally {
+    if (prev === undefined) {
+      delete process.env[envKey];
+    } else {
+      process.env[envKey] = prev;
+    }
+  }
+}
+
+/** Project picker cwds: active agent dir plus prod (~/.pi/agent) when dev is isolated. */
+export async function listProjectCwdsForPicker(): Promise<string[]> {
+  const merged: Array<{ cwd: string; modified: string }> = [];
+  const appendSessions = (sessions: PiSessionInfo[]) => {
+    for (const session of sessions) {
+      if (!session.cwd) continue;
+      merged.push({
+        cwd: session.cwd,
+        modified: session.modified instanceof Date ? session.modified.toISOString() : String(session.modified),
+      });
+    }
+  };
+
+  appendSessions(await SessionManager.listAll());
+
+  const agentDir = getAgentDir();
+  const defaultDir = getDefaultAgentDir();
+  if (resolve(agentDir) !== resolve(defaultDir)) {
+    try {
+      appendSessions(await listSessionsForAgentRoot(defaultDir));
+    } catch {
+      // ignore unreadable prod sessions dir
+    }
+  }
+
+  const cwds = getProjectCwds(merged);
+  const defaultWorkspaceCwd = loadPiWebPreferences().defaultWorkspaceCwd?.trim();
+  if (defaultWorkspaceCwd && !cwds.includes(defaultWorkspaceCwd)) {
+    cwds.push(defaultWorkspaceCwd);
+  }
+  return cwds;
 }
 
 export async function listAllSessions(): Promise<SessionInfo[]> {

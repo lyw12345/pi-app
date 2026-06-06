@@ -5,7 +5,6 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@/lib/agent-dir";
 import { PI_WEB_SKILL_WORKFLOW_APPEND } from "@/lib/skill-system-prompt";
-import memoryExtensionFactory from "@/lib/extensions/memory-extension";
 
 /** Resource loader for in-process AgentSession; adds Pi Web skill workflow guidance. */
 export async function createAgentResourceLoader(cwd: string): Promise<ResourceLoader> {
@@ -15,7 +14,6 @@ export async function createAgentResourceLoader(cwd: string): Promise<ResourceLo
     cwd,
     agentDir,
     settingsManager,
-    extensionFactories: [memoryExtensionFactory],
     appendSystemPrompt: [PI_WEB_SKILL_WORKFLOW_APPEND],
   });
   await loader.reload();

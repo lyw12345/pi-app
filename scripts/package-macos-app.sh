@@ -41,6 +41,70 @@ RES="$CONTENTS/Resources"
 MACOS="$CONTENTS/MacOS"
 NODE_DIR="$RES/node"
 PI_WEB_RES="$RES/pi-web"
+PI_MONO="${PI_MONO:-$(cd "$ROOT/../pi" && pwd)}"
+
+uses_local_pi_deps() {
+  node -e "
+    const d=require('$ROOT/package.json').dependencies||{};
+    const v=d['@earendil-works/pi-coding-agent']||'';
+    process.exit(String(v).startsWith('file:') ? 0 : 1);
+  "
+}
+
+ensure_local_pi_built() {
+  local marker="$PI_MONO/packages/coding-agent/dist/cli.js"
+  if [[ ! -f "$marker" ]]; then
+    echo "error: local pi not built — run: cd \"$PI_MONO\" && npm run build" >&2
+    exit 1
+  fi
+  local ver
+  ver="$(node -e "console.log(require('$PI_MONO/packages/coding-agent/package.json').version)")"
+  echo "local pi version: $ver"
+}
+
+pack_local_pi_vendor() {
+  local vendor_dir="$PI_WEB_RES/vendor"
+  rm -rf "$vendor_dir"
+  mkdir -p "$vendor_dir"
+  local pkg
+  for pkg in ai agent tui coding-agent; do
+    echo "packing pi $pkg into bundle vendor..."
+    (cd "$PI_MONO/packages/$pkg" && npm pack --pack-destination "$vendor_dir" >/dev/null)
+  done
+  ls -1 "$vendor_dir"/*.tgz
+}
+
+write_bundle_package_json_for_local_pi() {
+  node - "$PI_WEB_RES/package.json" "$PI_WEB_RES/vendor" <<'NODE'
+const fs = require("fs");
+const [pkgPath, vendorDir] = process.argv.slice(2);
+const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+const tggs = fs.readdirSync(vendorDir).filter((f) => f.endsWith(".tgz"));
+
+function fileRef(name) {
+  const slug = name.replace(/^@/, "").replace("/", "-");
+  const hit = tggs.find((f) => f.startsWith(`${slug}-`));
+  if (!hit) throw new Error(`missing vendor tgz for ${name}`);
+  return `file:./vendor/${hit}`;
+}
+
+const piPackages = [
+  "@earendil-works/pi-ai",
+  "@earendil-works/pi-agent-core",
+  "@earendil-works/pi-tui",
+  "@earendil-works/pi-coding-agent",
+];
+
+for (const name of piPackages) {
+  const ref = fileRef(name);
+  if (pkg.dependencies[name]) pkg.dependencies[name] = ref;
+  pkg.overrides = pkg.overrides || {};
+  pkg.overrides[name] = ref;
+}
+
+fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+NODE
+}
 
 build_production_next() {
   if [[ "$SKIP_BUILD" == "1" && -f "$PACK_NEXT/BUILD_ID" ]]; then
@@ -97,9 +161,24 @@ embed_node() {
 }
 
 install_production_deps() {
-  echo "npm ci --omit=dev in bundle..."
   rm -rf "$PI_WEB_RES/node_modules"
-  (cd "$PI_WEB_RES" && npm ci --omit=dev --ignore-scripts)
+  if uses_local_pi_deps; then
+    ensure_local_pi_built
+    pack_local_pi_vendor
+    write_bundle_package_json_for_local_pi
+    rm -f "$PI_WEB_RES/package-lock.json"
+    echo "npm install --omit=dev in bundle (local pi vendor tarballs)..."
+    (cd "$PI_WEB_RES" && npm install --omit=dev --ignore-scripts --no-package-lock)
+    local bundled_ver
+    bundled_ver="$(node -e "
+      const p=require('$PI_WEB_RES/node_modules/@earendil-works/pi-coding-agent/package.json');
+      console.log(p.version);
+    ")"
+    echo "bundled pi-coding-agent version: $bundled_ver"
+  else
+    echo "npm ci --omit=dev in bundle..."
+    (cd "$PI_WEB_RES" && npm ci --omit=dev --ignore-scripts)
+  fi
   find "$PI_WEB_RES/node_modules" -name "*.map" -delete 2>/dev/null || true
   echo "node_modules size: $(du -sh "$PI_WEB_RES/node_modules" | cut -f1)"
 }
@@ -117,9 +196,11 @@ rsync -a \
   "$ROOT/bin" \
   "$ROOT/public" \
   "$ROOT/package.json" \
-  "$ROOT/package-lock.json" \
   "$ROOT/next.config.ts" \
   "$PI_WEB_RES/"
+if ! uses_local_pi_deps; then
+  rsync -a "$ROOT/package-lock.json" "$PI_WEB_RES/"
+fi
 rsync -a \
   --exclude cache \
   --exclude dev \

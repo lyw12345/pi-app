@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listAllSessions } from "@/lib/session-reader";
+import { listAllSessions, listProjectCwdsForPicker } from "@/lib/session-reader";
 import { requireApiAuth } from "@/lib/api-auth";
 
 export async function GET(req: Request) {
@@ -7,8 +7,11 @@ export async function GET(req: Request) {
   if (rejected) return rejected;
 
   try {
-    const sessions = await listAllSessions();
-    return NextResponse.json({ sessions });
+    const [sessions, projectCwds] = await Promise.all([
+      listAllSessions(),
+      listProjectCwdsForPicker(),
+    ]);
+    return NextResponse.json({ sessions, projectCwds });
   } catch (error) {
     return NextResponse.json(
       { error: String(error) },

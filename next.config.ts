@@ -14,9 +14,36 @@ try {
   piVersion = (JSON.parse(readFileSync(piPkgPath, "utf8")) as { version: string }).version;
 } catch { /* package not found, use default */ }
 
+const piServerExternalPackages = [
+  "@earendil-works/pi-coding-agent",
+  "@earendil-works/pi-ai",
+  "@earendil-works/pi-agent-core",
+  "@earendil-works/pi-tui",
+  "jiti",
+  "typebox",
+];
+
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
-  serverExternalPackages: ["@earendil-works/pi-coding-agent", "@earendil-works/pi-ai"],
+  serverExternalPackages: piServerExternalPackages,
+  webpack: (config, { isServer }) => {
+    if (!isServer) return config;
+    // file: linked pi packages are still bundled by webpack dev unless forced external.
+    const prev = config.externals;
+    config.externals = [
+      ...(Array.isArray(prev) ? prev : prev ? [prev] : []),
+      ({ request }: { request?: string }, callback: (err?: Error | null, result?: string) => void) => {
+        if (!request) return callback();
+        if (
+          piServerExternalPackages.some((pkg) => request === pkg || request.startsWith(`${pkg}/`))
+        ) {
+          return callback(undefined, `module ${request}`);
+        }
+        callback();
+      },
+    ];
+    return config;
+  },
   devIndicators: process.env.NODE_ENV === "development" ? {
     position: "bottom-right",
   } : false,

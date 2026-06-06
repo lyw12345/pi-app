@@ -6,7 +6,6 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@/lib/agent-dir";
 import { loadPiWebPreferences } from "@/lib/pi-web-preferences";
-import memoryExtensionFactory from "@/lib/extensions/memory-extension";
 
 export interface ExtensionListItem {
   path: string;
@@ -59,7 +58,6 @@ export async function listExtensions(cwd: string): Promise<ExtensionsSnapshot> {
     cwd,
     agentDir,
     settingsManager,
-    extensionFactories: [memoryExtensionFactory],
   });
   await loader.reload();
   const resolved = await packageManager.resolve();
@@ -96,25 +94,6 @@ export async function listExtensions(cwd: string): Promise<ExtensionsSnapshot> {
       loadError,
     };
   });
-
-  // Add factory-loaded extensions (embedded in pi-web, not on disk)
-  for (const ext of loadResult.extensions) {
-    if (ext.path.startsWith("<inline")) {
-      const commands = [...ext.commands.values()].map((command) => ({
-        name: command.name,
-        description: command.description,
-      }));
-      extensions.push({
-        path: ext.path,
-        resolvedPath: ext.resolvedPath,
-        displayName: "Memory (built-in)",
-        enabled: true,
-        source: "auto",
-        scope: "user",
-        commands,
-      });
-    }
-  }
 
   const snapshot: ExtensionsSnapshot = {
     cwd,
