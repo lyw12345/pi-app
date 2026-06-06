@@ -350,13 +350,12 @@ export async function startRpcSession(
       : SessionManager.create(cwd, undefined);
 
     // Determine which tools to pass based on requested toolNames.
-    // Since v0.68.0, createAgentSession expects string[] tool names instead of Tool[] instances.
-    // Pass all built-in coding tool names by default; for "all off", pass empty array.
-    const allCodingToolNames = ["read", "bash", "edit", "write", "grep", "find", "ls"];
-    let toolsOption: string[] | undefined;
-    if (toolNames !== undefined) {
-      toolsOption = toolNames.length === 0 ? [] : allCodingToolNames;
-    }
+    // Do NOT pass `tools` to createAgentSession as a filter — that would
+    // exclude extension-registered tools (e.g. memory). Instead, let the
+    // full tool registry build with all extension tools, then narrow
+    // active tools via setActiveToolsByName.
+    // For "all off" (toolNames === []), pass noTools: "all" to disable all.
+    const noTools = toolNames?.length === 0 ? "all" as const : undefined;
 
     const resourceLoader = await createAgentResourceLoader(cwd);
 
@@ -365,12 +364,25 @@ export async function startRpcSession(
       agentDir,
       sessionManager,
       resourceLoader,
-      ...(toolsOption !== undefined ? { tools: toolsOption } : {}),
+      ...(noTools ? { noTools } : {}),
     });
 
-    // If specific tool names were requested (non-empty), narrow active tools now
+    // If specific tool names were requested (non-empty), narrow active tools now.
+    // Always include extension-registered tools (e.g. memory_set, memory_get) when
+    // any coding tools are active — they don't cost tokens when unused and LLM can
+    // call them when needed.
     if (toolNames && toolNames.length > 0) {
-      inner.setActiveToolsByName(toolNames);
+      // Get all extension tool names from the resource loader
+      const extResult = resourceLoader.getExtensions();
+      const extToolNames: string[] = [];
+      for (const ext of extResult.extensions) {
+        for (const toolName of ext.tools.keys()) {
+          if (!toolNames.includes(toolName)) {
+            extToolNames.push(toolName);
+          }
+        }
+      }
+      inner.setActiveToolsByName([...toolNames, ...extToolNames]);
     }
 
     // When all tools are disabled, clear the system prompt entirely.
