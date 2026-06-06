@@ -1021,15 +1021,15 @@ function SessionItem({
 
   const startRename = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setRenameValue(session.name ?? "");
+    setRenameValue(title);
     setRenaming(true);
     setTimeout(() => inputRef.current?.select(), 0);
-  }, [session.name]);
+  }, [title]);
 
   const commitRename = useCallback(async () => {
     const name = renameValue.trim();
     setRenaming(false);
-    if (name === (session.name ?? "")) return;
+    if (name === title.trim()) return;
     try {
       await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, {
         method: "PATCH",
@@ -1040,7 +1040,7 @@ function SessionItem({
     } catch {
       // ignore
     }
-  }, [renameValue, session.id, session.name, onRenamed]);
+  }, [renameValue, session.id, title, onRenamed]);
 
   const handleDeleteClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();

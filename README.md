@@ -56,14 +56,7 @@ PORT=8080 pi-web                 # 也支持环境变量
 ## 规划
 
 总计划：[docs/plan-pi-web-macos-workbench.md](docs/plan-pi-web-macos-workbench.md)  
-贯穿原则（M1–M4）：[docs/product-principles.md](docs/product-principles.md)
-
-| 里程碑 | 版本 | 清单 |
-|--------|------|------|
-| M1 装好就会用 | v1.0 | [清单](docs/m1-checklist.md) · [设计/技术方案](docs/m1-design.md) |
-| M2 日常办公够用 | v1.1–v1.2 | [docs/m2-checklist.md](docs/m2-checklist.md) |
-| M3 强于普通 Chat | v2.0 | [docs/m3-checklist.md](docs/m3-checklist.md) |
-| M4 平台化（按需） | v2.x+ | [docs/m4-checklist.md](docs/m4-checklist.md) |
+贯穿原则：[docs/product-principles.md](docs/product-principles.md)
 
 ## 开发
 

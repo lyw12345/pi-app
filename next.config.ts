@@ -2,7 +2,12 @@ import type { NextConfig } from "next";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8")) as { version: string };
+const packageJson = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8")) as {
+  version: string;
+  dependencies?: Record<string, string>;
+};
+const { version } = packageJson;
+const usesLocalPi = String(packageJson.dependencies?.["@earendil-works/pi-coding-agent"] ?? "").startsWith("file:");
 let piVersion = "unknown";
 try {
   const piPkgPath = join(__dirname, "node_modules/@earendil-works/pi-coding-agent/package.json");
@@ -16,7 +21,8 @@ const nextConfig: NextConfig = {
     position: "bottom-right",
   } : false,
   turbopack: {
-    root: __dirname,
+    // Turbopack won't resolve file:/npm-link deps outside the app root unless root is widened.
+    root: usesLocalPi ? join(__dirname, "..") : __dirname,
   },
   allowedDevOrigins: ["192.168.*.*"],
   env: {

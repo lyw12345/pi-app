@@ -163,7 +163,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return total > 0 ? { tokens, cost } : null;
   })();
 
-  const loadSession = useCallback(async (sid: string, showLoading = false, includeState = false) => {
+  const loadSession = useCallback(async (
+    sid: string,
+    showLoading = false,
+    includeState = false,
+    options?: { preserveMessages?: boolean },
+  ) => {
     try {
       if (showLoading) setLoading(true);
       const url = includeState
@@ -183,8 +188,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       const d = await res.json() as SessionData & { agentState?: { running: boolean; state?: { isStreaming?: boolean; isCompacting?: boolean; contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null; systemPrompt?: string; thinkingLevel?: string } } };
       setData(d);
       setActiveLeafId(d.leafId);
-      setMessages(d.context.messages);
-      setEntryIds(d.context.entryIds ?? []);
+      if (!options?.preserveMessages) {
+        setMessages(d.context.messages);
+        setEntryIds(d.context.entryIds ?? []);
+      }
       setCurrentModelOverride(null);
       setError(null);
       // If no live agent state, fall back to thinking level from session file
@@ -739,7 +746,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
 
     const showLoading = isSessionSwitch || (previousSessionId === null && !isInFlightCreate);
-    void loadSession(session.id, showLoading, true).then((agentState) => {
+    void loadSession(session.id, showLoading, true, { preserveMessages: isInFlightCreate }).then((agentState) => {
       if (cancelled) return;
       applyAgentRunningFromServer(agentState, session.id);
       if (agentState?.state) {
@@ -782,7 +789,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         scrollUserMsgToTop();
       } else if (!initialScrollDoneRef.current) {
         initialScrollDoneRef.current = true;
-        scrollToBottom("instant");
+        if (agentRunningRef.current && messages.some((m) => m.role === "user")) {
+          scrollUserMsgToTop();
+        } else {
+          scrollToBottom("instant");
+        }
       } else if (!agentRunningRef.current) {
         scrollToBottom("smooth");
       }

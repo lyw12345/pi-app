@@ -17,7 +17,7 @@
     "package.json"
   ],
   "scripts": {
-    "dev": "PI_CODING_AGENT_DIR=~/tmp/pi-dev-agent NEXT_DIST_DIR=.next-dev-30142 next dev -p 30142",
+    "dev": "PI_CODING_AGENT_DIR=~/tmp/pi-dev-agent NEXT_DIST_DIR=.next-dev-30142 next dev -p 30142 --webpack",
     "dev:prod": "echo 'WARNING: next dev on 30141 hot-reloads with source edits; use npm start for daily 30141.' >&2 && next dev -p 30141",
     "build": "next build --webpack",
     "start": "next start -p 30141",
@@ -36,8 +36,8 @@
     "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "^0.78.0",
-    "@earendil-works/pi-coding-agent": "^0.78.0",
+    "@earendil-works/pi-ai": "file:../pi/packages/ai",
+    "@earendil-works/pi-coding-agent": "file:../pi/packages/coding-agent",
     "@lobehub/icons": "5.10.0",
     "@types/react-syntax-highlighter": "^15.5.13",
     "mammoth": "^1.12.0",
