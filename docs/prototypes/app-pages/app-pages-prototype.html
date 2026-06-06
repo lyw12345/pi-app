@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pi Web App Pages Prototype</title>
+  <style>
+    :root {
+      --bg: #f5f5f7;
+      --panel: rgba(255,255,255,.78);
+      --panel-solid: #fff;
+      --sidebar: rgba(246,246,248,.9);
+      --hover: rgba(118,118,128,.11);
+      --selected: rgba(0,122,255,.13);
+      --border: rgba(60,60,67,.16);
+      --border-strong: rgba(60,60,67,.24);
+      --text: #1d1d1f;
+      --muted: rgba(60,60,67,.68);
+      --dim: rgba(60,60,67,.42);
+      --blue: #007aff;
+      --green: #34c759;
+      --orange: #ff9500;
+      --red: #ff3b30;
+      --purple: #af52de;
+      --shadow: 0 18px 50px rgba(0,0,0,.075);
+      --shadow-soft: 0 8px 24px rgba(0,0,0,.05);
+      --radius: 16px;
+      --sidebar-w: 260px;
+      --blur: saturate(180%) blur(22px);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 18% -12%, rgba(0,122,255,.12), transparent 30%),
+        radial-gradient(circle at 88% 8%, rgba(175,82,222,.08), transparent 28%),
+        linear-gradient(180deg, #fbfbfd 0%, var(--bg) 76%, #efeff4 100%);
+    }
+
+    button, input, textarea { font: inherit; }
+    button {
+      border: 0;
+      cursor: pointer;
+      color: var(--text);
+      background: transparent;
+    }
+    .primary {
+      background: var(--blue);
+      color: white;
+      box-shadow: 0 8px 18px rgba(0,122,255,.2);
+    }
+    .secondary {
+      background: rgba(255,255,255,.78);
+      border: 1px solid var(--border);
+    }
+    .ghost {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      grid-template-rows: 52px 1fr;
+    }
+
+    .app-sidebar {
+      grid-row: 1 / 3;
+      border-right: 1px solid var(--border);
+      background: var(--sidebar);
+      backdrop-filter: var(--blur);
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      min-width: 0;
+    }
+
+    .brand {
+      padding: 18px 10px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 780;
+      letter-spacing: -.02em;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .new-btn, .icon-btn {
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: rgba(255,255,255,.7);
+      font-size: 13px;
+      font-weight: 650;
+      box-shadow: 0 1px 0 rgba(255,255,255,.8) inset;
+    }
+    .new-btn {
+      flex: 0 0 auto;
+      padding: 0 10px;
+      white-space: nowrap;
+    }
+    .icon-btn { width: 34px; }
+    .new-btn.primary {
+      border-color: rgba(0,122,255,.26);
+      background: var(--blue);
+      color: white;
+    }
+
+    .workspace {
+      margin: 0 10px 12px;
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: rgba(255,255,255,.55);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      font: 13px var(--mono);
+      overflow: hidden;
+    }
+
+    .sidebar-scroll {
+      min-height: 0;
+      overflow: hidden;
+      padding: 8px 10px;
+    }
+    .side-label {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0 6px;
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 760;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .session, .file-entry {
+      border-radius: 12px;
+      padding: 9px 10px;
+      display: grid;
+      gap: 4px;
+      min-height: 50px;
+      color: var(--text);
+      background: transparent;
+      text-align: left;
+    }
+    .session.active, .file-entry.active {
+      background: var(--selected);
+      color: #0057d9;
+    }
+    .session-title, .file-title {
+      font-size: 13px;
+      font-weight: 650;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .session-meta, .file-meta {
+      color: var(--dim);
+      font-size: 11px;
+    }
+    .file-entry {
+      grid-template-columns: 18px minmax(0, 1fr);
+      align-items: center;
+      min-height: 42px;
+    }
+    .file-entry > span:last-child {
+      display: grid;
+      min-width: 0;
+    }
+
+    .side-bottom {
+      padding: 10px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      gap: 6px;
+    }
+    .side-tab {
+      min-height: 34px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      color: var(--muted);
+      background: transparent;
+      text-align: left;
+    }
+    .side-tab > span:last-child {
+      display: grid;
+      min-width: 0;
+    }
+    .side-tab.active {
+      background: var(--selected);
+      color: var(--blue);
+      outline: 1px solid rgba(0,122,255,.22);
+    }
+    .tab-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      background: rgba(118,118,128,.12);
+      font-size: 11px;
+    }
+    .tab-title { font-size: 13px; font-weight: 680; }
+    .tab-sub { color: var(--dim); font-size: 11px; margin-top: 1px; }
+
+    .topbar {
+      grid-column: 2;
+      height: 52px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.64);
+      backdrop-filter: var(--blur);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .top-left, .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .usage-pill, .chip {
+      min-height: 26px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.72);
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+    .chip.blue { color: var(--blue); background: rgba(0,122,255,.1); border-color: rgba(0,122,255,.18); }
+    .chip.green { color: #148b38; background: rgba(52,199,89,.12); border-color: rgba(52,199,89,.2); }
+    .chip.orange { color: #b76500; background: rgba(255,149,0,.13); border-color: rgba(255,149,0,.2); }
+
+    .page {
+      grid-column: 2;
+      display: none;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .page.active { display: block; }
+    .scroll-page {
+      height: calc(100vh - 52px);
+      overflow: auto;
+      padding: 34px 46px;
+    }
+    .page-narrow {
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+    .kicker {
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 780;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 32px;
+      line-height: 1.08;
+      font-weight: 800;
+      letter-spacing: -.04em;
+    }
+    h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 760;
+      letter-spacing: -.02em;
+    }
+    p { margin: 0; color: var(--muted); line-height: 1.55; }
+
+    .card {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      backdrop-filter: var(--blur);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
+    }
+    .hero-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 260px;
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .hero-card {
+      padding: 28px;
+      min-height: 190px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background:
+        radial-gradient(circle at 92% 18%, rgba(0,122,255,.13), transparent 36%),
+        var(--panel);
+    }
+    .hero-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+    .pill-btn {
+      min-height: 36px;
+      border-radius: 11px;
+      padding: 0 14px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .stat-stack {
+      display: grid;
+      gap: 14px;
+    }
+    .stat-card {
+      padding: 17px;
+      min-height: 92px;
+    }
+    .stat-value {
+      margin: 3px 0 2px;
+      font-size: 26px;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -.03em;
+    }
+    .section-head {
+      margin: 30px 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .work-list { overflow: hidden; }
+    .work-row {
+      width: 100%;
+      min-height: 66px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      text-align: left;
+    }
+    .work-row:first-child { border-top: 0; }
+    .work-row > span:first-child {
+      display: grid;
+      min-width: 0;
+    }
+    .work-title {
+      display: block;
+      font-size: 14px;
+      font-weight: 720;
+      letter-spacing: -.01em;
+      margin-bottom: 4px;
+    }
+    .work-desc {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .chat-shell {
+      height: calc(100vh - 52px);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 26px;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.1), rgba(0,122,255,.045)),
+        transparent;
+    }
+    .chat-main {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: 52px 1fr auto;
+    }
+    .chat-titlebar {
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.55);
+      backdrop-filter: var(--blur);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+    }
+    .chat-title {
+      font-size: 14px;
+      font-weight: 760;
+      letter-spacing: -.01em;
+    }
+    .chat-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .message-area {
+      overflow: auto;
+      padding: 24px 0 34px;
+    }
+    .message-stack {
+      width: min(760px, calc(100% - 72px));
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+    .msg {
+      display: grid;
+      gap: 6px;
+    }
+    .msg.user {
+      justify-items: end;
+      margin-bottom: 8px;
+    }
+    .bubble {
+      max-width: 690px;
+      padding: 13px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.82);
+      box-shadow: 0 1px 0 rgba(255,255,255,.9) inset;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .user .bubble {
+      max-width: 520px;
+      background: var(--blue);
+      color: white;
+      border-color: rgba(0,122,255,.55);
+      box-shadow: 0 10px 22px rgba(0,122,255,.18);
+    }
+    .msg-meta {
+      color: var(--dim);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .tool-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tool-chip {
+      min-height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255,255,255,.72);
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font: 12px var(--mono);
+    }
+    .tool-chip span { color: var(--dim); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; font-weight: 700; }
+    .file-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .file-pill {
+      min-height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      background: rgba(255,255,255,.76);
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font: 12px var(--mono);
+      color: var(--text);
+    }
+    .file-pill.active {
+      background: var(--selected);
+      color: var(--blue);
+      border-color: rgba(0,122,255,.2);
+    }
+    .composer-wrap {
+      padding: 14px 24px 18px;
+      border-top: 1px solid var(--border);
+      background: rgba(255,255,255,.55);
+      backdrop-filter: var(--blur);
+    }
+    .composer {
+      max-width: 860px;
+      margin: 0 auto;
+      border: 1px solid var(--border-strong);
+      border-radius: 18px;
+      overflow: hidden;
+      background: rgba(255,255,255,.86);
+      box-shadow: var(--shadow-soft);
+    }
+    .composer-input {
+      min-height: 64px;
+      padding: 16px 18px;
+      color: var(--dim);
+      font-size: 14px;
+    }
+    .composer-bar {
+      border-top: 1px solid var(--border);
+      padding: 9px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .composer-tools {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .send-btn {
+      min-height: 34px;
+      border-radius: 11px;
+      padding: 0 14px;
+      font-weight: 760;
+    }
+    .minimap {
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .mini-block {
+      width: 5px;
+      height: 42px;
+      border-radius: 999px;
+      background: rgba(118,118,128,.24);
+    }
+    .mini-block.active { background: rgba(0,122,255,.45); }
+    .mini-block.short { height: 24px; }
+
+    .preview-shell {
+      height: calc(100vh - 52px);
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) minmax(520px, 1.1fr);
+    }
+    .preview-chat {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: 52px 1fr auto;
+      border-right: 1px solid var(--border);
+    }
+    .preview-panel {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: 52px 1fr;
+      background: rgba(255,255,255,.48);
+    }
+    .preview-tabs {
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.64);
+      backdrop-filter: var(--blur);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 14px;
+    }
+    .preview-title {
+      font: 13px var(--mono);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .preview-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .preview-actions button {
+      min-height: 34px;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.78);
+      padding: 0 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .doc-wrap {
+      overflow: auto;
+      padding: 28px;
+    }
+    .doc {
+      max-width: 660px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--panel-solid);
+      box-shadow: var(--shadow);
+      padding: 28px 32px;
+      line-height: 1.65;
+    }
+    .doc h2 {
+      font-size: 26px;
+      margin-bottom: 12px;
+    }
+    .doc table {
+      width: 100%;
+      margin: 18px 0;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .doc th, .doc td {
+      border: 1px solid var(--border);
+      padding: 9px 10px;
+      text-align: left;
+    }
+    .doc code {
+      border-radius: 7px;
+      background: rgba(52,199,89,.12);
+      color: #128345;
+      padding: 2px 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .new-center {
+      height: calc(100vh - 52px);
+      display: grid;
+      place-items: center;
+      padding: 34px;
+    }
+    .new-card {
+      width: min(920px, 100%);
+      overflow: hidden;
+      border-radius: 20px;
+    }
+    .new-head {
+      padding: 28px 30px 18px;
+    }
+    .prompt-box {
+      margin: 0 20px 16px;
+      min-height: 160px;
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      background: rgba(255,255,255,.75);
+      padding: 18px;
+      color: var(--dim);
+      font-size: 14px;
+    }
+    .suggestions {
+      padding: 0 20px 20px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .suggestion {
+      min-height: 88px;
+      padding: 13px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.6);
+    }
+    .new-foot {
+      border-top: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: rgba(255,255,255,.54);
+    }
+
+    .history-tools {
+      margin: 20px 0 12px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 10px;
+    }
+    .search-box {
+      min-height: 40px;
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      background: rgba(255,255,255,.72);
+      color: var(--dim);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 1fr; }
+      .app-sidebar { display: none; }
+      .topbar, .page { grid-column: 1; }
+      .hero-panel, .preview-shell { grid-template-columns: 1fr; }
+      .preview-chat { display: none; }
+      .suggestions { grid-template-columns: 1fr; }
+      .scroll-page { padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="app-sidebar">
+      <div class="brand">
+        <div class="brand-title">Pi Agent Web</div>
+        <button class="new-btn primary" data-jump="new">＋ 新建</button>
+        <button class="icon-btn">↻</button>
+      </div>
+      <div class="workspace"><span>~/pi-cwd-20260603</span><span>⌄</span></div>
+      <div class="sidebar-scroll">
+        <div class="side-label"><span>最近对话</span><span>139</span></div>
+        <button class="session active" data-jump="chat" data-active-when="chat">
+          <span class="session-title">本地 claude</span>
+          <span class="session-meta">2 小时前 · 139 条消息</span>
+        </button>
+        <button class="session" data-jump="chat">
+          <span class="session-title">总结下 pi-web 项目</span>
+          <span class="session-meta">15 小时前 · 115 条消息</span>
+        </button>
+        <button class="session" data-jump="chat">
+          <span class="session-title">你有哪些 自带技能</span>
+          <span class="session-meta">17 小时前 · 225 条消息</span>
+        </button>
+        <button class="session" data-jump="chat">
+          <span class="session-title">把下载文件夹中的简历总结下</span>
+          <span class="session-meta">1 天前 · 102 条消息</span>
+        </button>
+
+        <div class="side-label"><span>资源管理器</span><span>↻</span></div>
+        <button class="file-entry"><span>▸</span><span><span class="file-title">.gstack</span><span class="file-meta">folder</span></span></button>
+        <button class="file-entry"><span>▸</span><span><span class="file-title">garden-gpt-image-2</span><span class="file-meta">folder</span></span></button>
+        <button class="file-entry"><span>▸</span><span><span class="file-title">output</span><span class="file-meta">folder</span></span></button>
+        <button class="file-entry active" data-jump="file" data-active-when="file"><span>◇</span><span><span class="file-title">weekly-digest-2026-06-03.md</span><span class="file-meta">markdown</span></span></button>
+      </div>
+      <div class="side-bottom">
+        <button class="side-tab" data-jump="home"><span class="tab-icon">⌂</span><span><span class="tab-title">首页</span><span class="tab-sub">工作台</span></span></button>
+        <button class="side-tab" data-jump="history"><span class="tab-icon">⌘</span><span><span class="tab-title">全部工作</span><span class="tab-sub">搜索与筛选</span></span></button>
+        <button class="side-tab"><span class="tab-icon">⚙</span><span><span class="tab-title">设置</span><span class="tab-sub">模型 · 技能 · 远程</span></span></button>
+      </div>
+    </aside>
+
+    <header class="topbar">
+      <div class="top-left"><button class="ghost">☰</button><button class="ghost">☾</button><span id="topCrumb">首页</span></div>
+      <div class="top-actions"><span class="usage-pill">↑215k · ↓15k · $1.88</span><button class="ghost" data-jump="file">显示文件面板</button></div>
+    </header>
+
+    <main class="page active" id="home">
+      <div class="scroll-page">
+        <div class="page-narrow">
+          <div class="kicker">Workspace</div>
+          <h1>Pi 工作台</h1>
+          <div class="hero-panel">
+            <section class="card hero-card">
+              <div>
+                <p>首页只做两件事：开始新对话，回到最近工作。项目、文件和设置保持在左侧与底部，不打断主流程。</p>
+              </div>
+              <div class="hero-actions">
+                <button class="pill-btn primary" data-jump="new">新建对话</button>
+                <button class="pill-btn secondary" data-jump="history">查看全部历史</button>
+              </div>
+            </section>
+            <div class="stat-stack">
+              <section class="card stat-card"><div class="kicker">当前项目</div><div class="stat-value">pi-cwd</div><p>~/pi-cwd-20260603</p></section>
+              <section class="card stat-card"><div class="kicker">今天</div><div class="stat-value">3</div><p>活跃对话 · 1 个文件打开</p></section>
+            </div>
+          </div>
+          <div class="section-head"><h2>我的工作</h2><button class="ghost" data-jump="history">查看全部</button></div>
+          <section class="card work-list">
+            <button class="work-row" data-jump="chat"><span><span class="work-title">本地 claude</span><span class="work-desc">本地 claude cli 使用不了，帮忙检查修改为可以</span></span><span class="chip green">进行中</span><span class="chip">2026/6/5</span></button>
+            <button class="work-row"><span><span class="work-title">总结下 pi-web 项目</span><span class="work-desc">梳理项目结构、模块和开发注意事项</span></span><span class="chip">完成</span><span class="chip">2026/6/4</span></button>
+            <button class="work-row"><span><span class="work-title">你有哪些 自带技能</span><span class="work-desc">查看系统中可用 skills 与使用方式</span></span><span class="chip">完成</span><span class="chip">2026/6/4</span></button>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <main class="page" id="chat">
+      <div class="chat-shell">
+        <section class="chat-main">
+          <div class="chat-titlebar">
+            <div class="chat-title">本地 claude cli 使用不了，帮忙检查修改为可以</div>
+            <div class="chat-actions"><button class="pill-btn secondary">系统</button><span class="usage-pill">↑215k · ↓15k · $1.88</span><button class="ghost">⋯</button></div>
+          </div>
+          <div class="message-area">
+            <div class="message-stack">
+              <div class="msg user"><div class="bubble">本地 claude cli 使用不了，帮忙检查修改为可以</div><div class="msg-meta">你 · 08:15 · 从这里编辑 · 另开一版</div></div>
+              <div class="msg"><div class="msg-meta">GPT-5.5 · 08:16</div><div class="bubble">我先做一次系统化排查：确认命令位置、Node 环境、Claude 配置与网络请求，再给出最小修复。</div></div>
+              <div class="tool-grid">
+                <div class="tool-chip">read /Users/mk/.agents/skills/investigate… <span>4s</span></div>
+                <div class="tool-chip">bash claude --version && claude doctor <span>67s</span></div>
+                <div class="tool-chip">bash grep -R "ANTHROPIC_BASE_URL" ~/.claude <span>17s</span></div>
+              </div>
+              <div class="msg"><div class="msg-meta">GPT-5.5 · 输入 3,210 · 输出 482 · $0.0390</div><div class="bubble">定位结果：本地 CLI 配置指向了不可达的 API Host，且 shell 环境里仍有旧变量。建议只改用户级配置，不动项目文件。</div></div>
+              <div class="file-pills">
+                <button class="file-pill">◇ m1-design.md</button>
+                <button class="file-pill">◇ m2-checklist.md</button>
+                <button class="file-pill" data-jump="file">◇ README.md</button>
+                <button class="file-pill">◇ product-principles.md</button>
+              </div>
+              <div class="msg"><div class="msg-meta">GPT-5.5 · 12:22</div><div class="bubble">已清理过期文档并保留 README / product-principles 的索引关系。文件输出可以直接点击在右侧预览。</div></div>
+            </div>
+          </div>
+          <div class="composer-wrap">
+            <div class="composer">
+              <div class="composer-input">发送消息...</div>
+              <div class="composer-bar"><div class="composer-tools"><span class="chip">DeepSeek V4 Pro</span><span class="chip">high</span><span class="chip">default tools</span><span class="chip">分享</span><span class="chip">压缩</span></div><button class="send-btn primary">发送 →</button></div>
+            </div>
+          </div>
+        </section>
+        <aside class="minimap"><span class="mini-block short"></span><span class="mini-block active"></span><span class="mini-block short"></span><span class="mini-block"></span><span class="mini-block short"></span></aside>
+      </div>
+    </main>
+
+    <main class="page" id="file">
+      <div class="preview-shell">
+        <section class="preview-chat">
+          <div class="chat-titlebar"><div class="chat-title">文件输出已打开预览</div><button class="ghost" data-jump="chat">隐藏文件面板</button></div>
+          <div class="message-area">
+            <div class="message-stack">
+              <div class="msg"><div class="msg-meta">GPT-5.5</div><div class="bubble">已生成周报摘要，并输出 Markdown 文件。</div></div>
+              <div class="file-pills"><button class="file-pill active">◇ weekly-digest-2026-06-03.md</button><button class="file-pill">◇ README.md</button></div>
+              <div class="msg user"><div class="bubble">打开第一个文件预览</div></div>
+            </div>
+          </div>
+          <div class="composer-wrap"><div class="composer"><div class="composer-input">继续追问这个文件...</div><div class="composer-bar"><div class="composer-tools"><span class="chip blue">带入当前文件</span><span class="chip">DeepSeek V4 Pro</span></div><button class="send-btn secondary">发送</button></div></div></div>
+        </section>
+        <aside class="preview-panel">
+          <div class="preview-tabs">
+            <div class="preview-title">◇ weekly-digest-2026-06-03.md</div>
+            <div class="preview-actions"><button>复制为图片</button><button>保存为图片</button><button class="ghost">×</button></div>
+          </div>
+          <div class="doc-wrap">
+            <article class="doc">
+              <h2>Weekly Report Digest</h2>
+              <p>本周工作集中在 pi-web 设置页、文件预览和开发/生产隔离，关键风险已收敛到可验证范围。</p>
+              <table>
+                <tr><th>模块</th><th>状态</th><th>下一步</th></tr>
+                <tr><td>模型配置</td><td>✅ 已更新</td><td>补 thinking level 映射</td></tr>
+                <tr><td>技能管理</td><td>✅ 已对齐</td><td>保持极简详情页</td></tr>
+                <tr><td>文件预览</td><td>✅ 已可点击</td><td>图片导出增强</td></tr>
+              </table>
+              <p>相关文件：<code>README.md</code>、<code>product-principles.md</code>、<code>docs/prototypes/</code></p>
+            </article>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <main class="page" id="new">
+      <div class="new-center">
+        <section class="card new-card">
+          <div class="new-head">
+            <div class="kicker">New Session</div>
+            <h1>先说要做什么，配置留在底部</h1>
+            <p>保留一个主输入框；模型、工具、项目目录作为辅助选择，不抢用户注意力。</p>
+          </div>
+          <div class="prompt-box">例如：审查 pi-web 的文件预览模块，优先找正确性和安全风险...</div>
+          <div class="suggestions">
+            <button class="suggestion"><span class="work-title">审查代码</span><span class="work-desc">定位风险、给出补丁和测试计划。</span></button>
+            <button class="suggestion"><span class="work-title">整理项目</span><span class="work-desc">生成 README、架构图或模块清单。</span></button>
+            <button class="suggestion"><span class="work-title">处理文件</span><span class="work-desc">总结、转换、预览或导出文件。</span></button>
+          </div>
+          <div class="new-foot"><div class="composer-tools"><span class="chip">~/pi-cwd-20260603</span><span class="chip">DeepSeek V4 Pro</span><span class="chip">工具：default</span><span class="chip">thinking：high</span></div><button class="send-btn primary">开始 →</button></div>
+        </section>
+      </div>
+    </main>
+
+    <main class="page" id="history">
+      <div class="scroll-page">
+        <div class="page-narrow">
+          <div class="kicker">All Work</div>
+          <h1>用搜索和分组找回上下文</h1>
+          <p>历史页不重复首页：它专注查找、筛选、批量管理和恢复工作流。</p>
+          <div class="history-tools"><div class="search-box">搜索标题、消息、文件路径...</div><button class="pill-btn secondary">最近 30 天</button><button class="pill-btn secondary">仅进行中</button></div>
+          <section class="card work-list">
+            <button class="work-row" data-jump="chat"><span><span class="work-title">本地 claude</span><span class="work-desc">139 条消息 · GPT-5.5 · $1.88 · ~/pi-cwd-20260603</span></span><span class="chip green">进行中</span><span class="chip">今天</span></button>
+            <button class="work-row"><span><span class="work-title">总结下 pi-web 项目</span><span class="work-desc">115 条消息 · 含文件预览输出 · 15 小时前</span></span><span class="chip">完成</span><span class="chip">昨天</span></button>
+            <button class="work-row"><span><span class="work-title">你有哪些 自带技能</span><span class="work-desc">225 条消息 · skills / models / settings</span></span><span class="chip">完成</span><span class="chip">昨天</span></button>
+            <button class="work-row"><span><span class="work-title">检查本地仓库代码</span><span class="work-desc">代码审查 · 有提交 · 已推送远程</span></span><span class="chip blue">已提交</span><span class="chip">06/03</span></button>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const pages = Array.from(document.querySelectorAll(".page"));
+    const jumpers = Array.from(document.querySelectorAll("[data-jump]"));
+    const crumb = document.getElementById("topCrumb");
+    const labels = {
+      home: "首页",
+      chat: "对话",
+      file: "文件预览",
+      new: "新建对话",
+      history: "全部工作"
+    };
+    function activate(id) {
+      pages.forEach((page) => page.classList.toggle("active", page.id === id));
+      jumpers.forEach((item) => {
+        const activeWhen = item.dataset.activeWhen;
+        const isPrimaryNav = item.classList.contains("side-tab");
+        item.classList.toggle("active", activeWhen ? activeWhen === id : isPrimaryNav && item.dataset.jump === id);
+      });
+      if (crumb) crumb.textContent = labels[id] || "Pi";
+      history.replaceState(null, "", `#${id}`);
+    }
+    jumpers.forEach((item) => item.addEventListener("click", () => activate(item.dataset.jump)));
+    const initial = location.hash.replace("#", "");
+    if (initial && document.getElementById(initial)) activate(initial);
+    window.addEventListener("hashchange", () => {
+      const id = location.hash.replace("#", "");
+      if (id && document.getElementById(id)) activate(id);
+    });
+  </script>
+</body>
+</html>

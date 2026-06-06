@@ -1,0 +1,3514 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pi Web Settings Center Prototype</title>
+  <style>
+    :root {
+      --bg: #f5f5f7;
+      --panel: rgba(255,255,255,.78);
+      --panel-solid: #fff;
+      --sidebar: rgba(246,246,248,.9);
+      --hover: rgba(118,118,128,.11);
+      --selected: rgba(0,122,255,.13);
+      --border: rgba(60,60,67,.16);
+      --border-strong: rgba(60,60,67,.24);
+      --text: #1d1d1f;
+      --muted: rgba(60,60,67,.68);
+      --dim: rgba(60,60,67,.42);
+      --blue: #007aff;
+      --green: #34c759;
+      --orange: #ff9500;
+      --red: #ff3b30;
+      --purple: #af52de;
+      --shadow: 0 18px 50px rgba(0,0,0,.075);
+      --shadow-soft: 0 8px 24px rgba(0,0,0,.05);
+      --radius: 16px;
+      --sidebar-w: 260px;
+      --settings-nav-w: 248px;
+      --blur: saturate(180%) blur(22px);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 18% -12%, rgba(0,122,255,.12), transparent 30%),
+        radial-gradient(circle at 88% 8%, rgba(175,82,222,.08), transparent 28%),
+        linear-gradient(180deg, #fbfbfd 0%, var(--bg) 76%, #efeff4 100%);
+    }
+
+    button, input, textarea { font: inherit; }
+    button { border: 0; }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      grid-template-rows: 52px 1fr;
+    }
+
+    .app-sidebar {
+      grid-row: 1 / 3;
+      border-right: 1px solid var(--border);
+      background: var(--sidebar);
+      backdrop-filter: var(--blur);
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      min-width: 0;
+    }
+
+    .brand {
+      padding: 18px 12px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-title {
+      font-size: 20px;
+      font-weight: 780;
+      letter-spacing: -.02em;
+      flex: 1;
+    }
+    .new-btn {
+      height: 34px;
+      padding: 0 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: rgba(255,255,255,.7);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 650;
+      box-shadow: 0 1px 0 rgba(255,255,255,.8) inset;
+    }
+
+    .workspace {
+      margin: 0 10px 12px;
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: rgba(255,255,255,.55);
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--text);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .sessions { padding: 8px 10px; overflow: hidden; }
+    .session {
+      min-height: 54px;
+      border-radius: 12px;
+      padding: 9px 10px;
+      display: grid;
+      gap: 4px;
+      color: var(--text);
+    }
+    .session.active { background: var(--selected); color: #0057d9; }
+    .session-title {
+      font-size: 13px;
+      font-weight: 650;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .session-meta { font-size: 11px; color: var(--dim); }
+
+    .side-bottom {
+      padding: 10px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      gap: 6px;
+    }
+    .side-tab {
+      height: 34px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      font-size: 13px;
+      font-weight: 650;
+      color: var(--muted);
+      background: transparent;
+    }
+    .side-tab.active {
+      background: var(--selected);
+      color: var(--blue);
+      outline: 1px solid rgba(0,122,255,.22);
+    }
+
+    .topbar {
+      grid-column: 2;
+      height: 52px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.64);
+      backdrop-filter: var(--blur);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .settings-shell {
+      grid-column: 2;
+      min-width: 0;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: var(--settings-nav-w) minmax(0, 1fr);
+    }
+
+    .settings-nav {
+      border-right: 1px solid var(--border);
+      background: rgba(250,250,252,.68);
+      backdrop-filter: var(--blur);
+      padding: 22px 14px;
+      overflow-y: auto;
+    }
+
+    .settings-kicker {
+      color: var(--dim);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 760;
+      letter-spacing: .06em;
+      margin-bottom: 5px;
+    }
+    .settings-title {
+      font-size: 28px;
+      font-weight: 790;
+      letter-spacing: -.035em;
+      margin-bottom: 20px;
+    }
+
+    .nav-group { margin: 18px 0 8px; }
+    .nav-label {
+      padding: 0 10px 7px;
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 760;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .nav-item {
+      width: 100%;
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 10px;
+      padding: 0 10px;
+      background: transparent;
+      color: var(--muted);
+      text-align: left;
+      cursor: pointer;
+      transition: background .16s ease, color .16s ease, transform .16s ease;
+    }
+    .nav-item:hover { background: var(--hover); color: var(--text); }
+    .nav-item.active {
+      background: var(--selected);
+      color: var(--blue);
+      font-weight: 720;
+      box-shadow: 0 1px 0 rgba(255,255,255,.8) inset;
+    }
+    .nav-item:active { transform: scale(.99); }
+    .nav-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 7px;
+      display: inline-grid;
+      place-items: center;
+      background: rgba(118,118,128,.13);
+      font-size: 12px;
+      flex: 0 0 auto;
+    }
+    .nav-item.active .nav-icon {
+      background: rgba(0,122,255,.16);
+    }
+    .nav-text { flex: 1; min-width: 0; font-size: 13px; }
+    .nav-badge {
+      min-width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--green);
+      box-shadow: 0 0 0 2px rgba(52,199,89,.16);
+    }
+
+    .content {
+      overflow-y: auto;
+      padding: 36px 42px 80px;
+    }
+    .page {
+      max-width: 980px;
+      display: none;
+      animation: fadeIn .18s ease both;
+    }
+    .page.active { display: block; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .page-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 22px;
+    }
+    .page-title {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: -.04em;
+      font-weight: 790;
+    }
+    .page-desc {
+      margin: 8px 0 0;
+      max-width: 650px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .pill {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: rgba(52,199,89,.13);
+      color: #148b38;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      font-weight: 720;
+      white-space: nowrap;
+    }
+    .pill::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+    .usage-pill {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.72);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      font-weight: 720;
+      white-space: nowrap;
+    }
+
+    .grid { display: grid; gap: 14px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .card {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      backdrop-filter: var(--blur);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 0 rgba(255,255,255,.72) inset;
+      overflow: hidden;
+    }
+    .summary-card {
+      min-height: 152px;
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+      align-content: space-between;
+      cursor: pointer;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+    }
+    .summary-card:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-soft);
+      border-color: var(--border-strong);
+      background: rgba(255,255,255,.9);
+    }
+    .summary-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .summary-title {
+      font-size: 15px;
+      font-weight: 760;
+      letter-spacing: -.01em;
+    }
+    .summary-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 17px;
+      font-weight: 800;
+      box-shadow: 0 12px 28px rgba(0,0,0,.12);
+    }
+    .summary-icon.blue { background: linear-gradient(135deg, #0a84ff, #5ac8fa); }
+    .summary-icon.green { background: linear-gradient(135deg, #30d158, #34c759); }
+    .summary-icon.orange { background: linear-gradient(135deg, #ff9f0a, #ffd60a); }
+    .summary-icon.purple { background: linear-gradient(135deg, #bf5af2, #64d2ff); }
+    .summary-value {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 650;
+      line-height: 1.4;
+    }
+    .summary-desc {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .card-action {
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .section-title {
+      margin: 28px 0 12px;
+      color: var(--dim);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: .06em;
+    }
+
+    .setting-list { overflow: hidden; }
+    .setting-row {
+      min-height: 66px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 18px;
+      padding: 15px 17px;
+      border-bottom: 1px solid var(--border);
+    }
+    .setting-row:last-child { border-bottom: 0; }
+    .setting-name {
+      font-size: 14px;
+      font-weight: 720;
+      margin-bottom: 4px;
+    }
+    .setting-help {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .segmented {
+      display: inline-flex;
+      padding: 3px;
+      border: 1px solid var(--border);
+      background: rgba(118,118,128,.08);
+      border-radius: 10px;
+      gap: 2px;
+    }
+    .segmented button {
+      height: 28px;
+      padding: 0 11px;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .segmented button.active {
+      background: var(--panel-solid);
+      color: var(--text);
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+    }
+
+    .primary, .secondary, .danger, .ghost {
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 720;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .primary { background: var(--blue); color: white; box-shadow: 0 8px 18px rgba(0,122,255,.2); }
+    .secondary { background: rgba(255,255,255,.78); color: var(--text); border: 1px solid var(--border); }
+    .danger { background: rgba(255,59,48,.1); color: var(--red); border: 1px solid rgba(255,59,48,.22); }
+    .ghost { background: transparent; color: var(--blue); }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 26px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(52,199,89,.12);
+      color: #148b38;
+      font-size: 12px;
+      font-weight: 720;
+      white-space: nowrap;
+    }
+    .status-chip.orange { background: rgba(255,149,0,.13); color: #b76500; }
+    .status-chip.gray { background: rgba(118,118,128,.12); color: var(--muted); }
+    .status-chip::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .device {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+    }
+    .device:first-child { border-top: 0; }
+    .device-title { font-size: 13px; font-weight: 720; }
+    .device-meta { margin-top: 3px; color: var(--muted); font-size: 12px; }
+
+    .advanced-callout {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 16px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(175,82,222,.2);
+      background: linear-gradient(135deg, rgba(175,82,222,.1), rgba(0,122,255,.06));
+    }
+    .advanced-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: linear-gradient(135deg, var(--purple), var(--blue));
+      font-weight: 850;
+      box-shadow: 0 14px 28px rgba(98,86,255,.2);
+    }
+
+    .mini-chart {
+      height: 150px;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      align-items: end;
+      gap: 14px;
+      padding: 18px 18px 12px;
+    }
+    .bar-wrap {
+      display: grid;
+      gap: 8px;
+      justify-items: center;
+      color: var(--dim);
+      font-size: 11px;
+    }
+    .bars {
+      height: 92px;
+      display: flex;
+      align-items: end;
+      gap: 4px;
+    }
+    .bar {
+      width: 7px;
+      min-height: 4px;
+      border-radius: 999px;
+      background: var(--blue);
+    }
+    .bar.green { background: var(--green); }
+    .bar.orange { background: var(--orange); }
+
+    .code {
+      font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: rgba(118,118,128,.09);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hero-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr);
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .hero-copy {
+      padding: 20px;
+      border-radius: var(--radius);
+      background:
+        radial-gradient(circle at 92% 0%, rgba(0,122,255,.12), transparent 32%),
+        var(--panel);
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 0 rgba(255,255,255,.72) inset;
+    }
+    .hero-eyebrow {
+      color: var(--dim);
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 820;
+      letter-spacing: .06em;
+      margin-bottom: 10px;
+    }
+    .hero-big {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -.035em;
+      margin-bottom: 8px;
+    }
+    .hero-text {
+      max-width: 620px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      margin: 0;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .stat-stack {
+      display: grid;
+      gap: 10px;
+    }
+    .stat {
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.7);
+    }
+    .stat-label {
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 760;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .stat-value {
+      margin-top: 4px;
+      font-size: 18px;
+      font-weight: 790;
+      letter-spacing: -.02em;
+    }
+    .stat-help {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+    .field-label {
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 760;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .input-like, .textarea-like {
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      background: rgba(255,255,255,.78);
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.4;
+      min-width: 220px;
+    }
+    .input-like.placeholder {
+      color: var(--dim);
+    }
+    .field-help {
+      color: var(--dim);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .secret-field {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      background: rgba(255,255,255,.78);
+      padding: 0 10px 0 0;
+    }
+    .secret-field .input-like {
+      border: 0;
+      background: transparent;
+      min-width: 0;
+      width: 100%;
+    }
+    .eye-icon {
+      color: var(--dim);
+      font-size: 16px;
+    }
+    .icon-button {
+      border: 0;
+      background: transparent;
+      color: var(--dim);
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+    .icon-button:hover {
+      background: rgba(118,118,128,.12);
+      color: var(--text);
+    }
+    .textarea-like {
+      min-height: 78px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--muted);
+      white-space: pre-line;
+    }
+    .inline-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toggle {
+      width: 44px;
+      height: 26px;
+      border-radius: 999px;
+      padding: 2px;
+      background: var(--green);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+    }
+    .toggle.off {
+      background: rgba(118,118,128,.25);
+      justify-content: flex-start;
+    }
+    .knob {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: white;
+      box-shadow: 0 2px 7px rgba(0,0,0,.18);
+    }
+
+    .model-list, .skill-grid, .audit-list, .command-list {
+      display: grid;
+      gap: 10px;
+    }
+    .model-card, .skill-card, .audit-item, .command-card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.68);
+      padding: 14px;
+    }
+    .model-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+    .model-name, .skill-name, .command-title {
+      font-size: 14px;
+      font-weight: 760;
+      letter-spacing: -.01em;
+    }
+    .model-meta, .skill-meta, .command-help, .audit-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .skill-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .skill-card {
+      min-height: 112px;
+      display: grid;
+      align-content: space-between;
+    }
+    .skill-tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 9px;
+    }
+    .tag {
+      border-radius: 999px;
+      background: rgba(118,118,128,.1);
+      color: var(--muted);
+      padding: 3px 7px;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .qr-card {
+      min-height: 238px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(90deg, rgba(0,0,0,.06) 1px, transparent 1px),
+        linear-gradient(rgba(0,0,0,.06) 1px, transparent 1px),
+        rgba(255,255,255,.76);
+      background-size: 22px 22px;
+      position: relative;
+      overflow: hidden;
+    }
+    .qr-card::after {
+      content: "QR";
+      width: 94px;
+      height: 94px;
+      border-radius: 18px;
+      background: white;
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      font-weight: 860;
+      letter-spacing: .08em;
+      box-shadow: var(--shadow-soft);
+    }
+    .security-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .security-tile {
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.68);
+      padding: 13px;
+    }
+
+    .audit-item {
+      display: grid;
+      grid-template-columns: 9px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+    }
+    .audit-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      margin-top: 5px;
+      background: var(--green);
+    }
+    .audit-dot.blue { background: var(--blue); }
+    .audit-dot.orange { background: var(--orange); }
+    .audit-dot.red { background: var(--red); }
+    .audit-title {
+      font-size: 13px;
+      font-weight: 720;
+    }
+
+    .danger-zone {
+      border: 1px solid rgba(255,59,48,.2);
+      background: rgba(255,59,48,.045);
+    }
+    .empty-state {
+      border: 1px dashed var(--border-strong);
+      border-radius: 14px;
+      padding: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      background: rgba(255,255,255,.38);
+    }
+
+    .split-workspace {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 430px;
+      overflow: hidden;
+    }
+    .split-rail {
+      border-right: 1px solid var(--border);
+      background: rgba(250,250,252,.62);
+      padding: 12px;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+    .split-detail {
+      padding: 18px;
+      display: grid;
+      align-content: start;
+      gap: 14px;
+    }
+    .rail-title {
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      padding: 6px 8px 2px;
+    }
+    .rail-item {
+      min-height: 50px;
+      border-radius: 11px;
+      padding: 10px;
+      display: grid;
+      gap: 3px;
+      background: transparent;
+      cursor: pointer;
+    }
+    .rail-item.active {
+      background: var(--selected);
+      outline: 1px solid rgba(0,122,255,.14);
+    }
+    .rail-main {
+      font-size: 13px;
+      font-weight: 760;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .rail-sub {
+      font-size: 11px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .step-flow {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .step-card {
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      background: rgba(255,255,255,.7);
+      padding: 15px;
+      display: grid;
+      gap: 10px;
+      min-height: 152px;
+    }
+    .step-number {
+      width: 25px;
+      height: 25px;
+      border-radius: 999px;
+      background: var(--blue);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 820;
+      box-shadow: 0 8px 18px rgba(0,122,255,.18);
+    }
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .provider-tile {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.7);
+      padding: 13px;
+      display: grid;
+      gap: 8px;
+      min-height: 132px;
+    }
+    .provider-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 11px;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 13px;
+      font-weight: 820;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+    }
+    .provider-logo.green { background: linear-gradient(135deg, var(--green), #64d2ff); }
+    .provider-logo.orange { background: linear-gradient(135deg, var(--orange), #ffd60a); }
+    .provider-logo.gray { background: linear-gradient(135deg, #8e8e93, #c7c7cc); }
+    .detail-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .detail-title {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -.025em;
+    }
+    .detail-desc {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .detail-desc .module-path {
+      display: inline-block;
+      max-width: 360px;
+      vertical-align: bottom;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .cap-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .cap {
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.72);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .cap.active {
+      color: var(--blue);
+      background: rgba(0,122,255,.1);
+      border-color: rgba(0,122,255,.2);
+    }
+    .skill-search {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      margin-top: 14px;
+    }
+    .skill-add-card {
+      display: grid;
+      gap: 16px;
+      padding: 22px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.66);
+      border: 1px solid var(--border);
+    }
+	    .scope-path {
+	      display: flex;
+	      align-items: center;
+	      gap: 12px;
+	      flex-wrap: wrap;
+	      color: var(--dim);
+	      font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+	    }
+	    .scope-path .scope-dest {
+	      white-space: nowrap;
+	    }
+    .market-list {
+      display: grid;
+      gap: 10px;
+    }
+    .market-item {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.7);
+      padding: 14px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+    .management-shell {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: rgba(255,255,255,.72);
+      overflow: hidden;
+      box-shadow: 0 1px 0 rgba(255,255,255,.72) inset;
+    }
+    .module-window {
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: rgba(250,250,252,.82);
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,.08), 0 1px 0 rgba(255,255,255,.72) inset;
+    }
+    .module-titlebar {
+      min-height: 76px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(250,250,252,.88);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 0 26px;
+    }
+    .module-titlegroup {
+      min-width: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+    }
+    .module-title {
+      font-size: 24px;
+      font-weight: 840;
+      letter-spacing: -.04em;
+    }
+    .module-path {
+      color: var(--muted);
+      font: 15px ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .module-close {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 28px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .module-window .management-body {
+      grid-template-columns: 340px minmax(0, 1fr);
+      min-height: 650px;
+    }
+    .module-window .manager-detail {
+      padding: 40px 42px 88px;
+    }
+    .module-window .big-form {
+      max-width: 1040px;
+    }
+    .management-top {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(250,250,252,.72);
+      display: grid;
+      gap: 10px;
+    }
+    .select-like {
+      min-height: 44px;
+      border: 1px solid var(--border-strong);
+      border-radius: 11px;
+      background: rgba(255,255,255,.82);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 13px;
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .management-body {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      min-height: 560px;
+    }
+    .manager-left {
+      border-right: 1px solid var(--border);
+      background: rgba(250,250,252,.62);
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      min-height: 0;
+    }
+    .manager-list {
+      overflow: auto;
+      padding: 10px 8px;
+    }
+    .manager-footer {
+      border-top: 1px solid var(--border);
+      padding: 10px 8px;
+    }
+    .manager-add {
+      width: 100%;
+      min-height: 42px;
+      border: 1px dashed var(--border-strong);
+      border-radius: 12px;
+      background: rgba(255,255,255,.46);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 740;
+      cursor: pointer;
+    }
+    .tree-group {
+      margin: 7px 0 8px;
+      padding: 0 8px;
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 820;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .tree-row {
+      min-height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 10px;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .tree-row.active {
+      background: var(--selected);
+      color: var(--blue);
+      font-weight: 760;
+    }
+    .tree-row.dim { color: var(--muted); }
+    .tree-indent { padding-left: 34px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .tree-icon {
+      width: 19px;
+      height: 19px;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      background: rgba(118,118,128,.12);
+      font-size: 11px;
+      flex: 0 0 auto;
+    }
+    .manager-detail {
+      min-width: 0;
+      overflow: auto;
+      padding: 24px 28px 80px;
+      position: relative;
+    }
+    .save-bar {
+      border-top: 1px solid var(--border);
+      background: rgba(250,250,252,.86);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 9px;
+    }
+    .big-form {
+      display: grid;
+      gap: 18px;
+      max-width: 760px;
+    }
+    .big-form.wide {
+      max-width: 980px;
+    }
+    .form-section {
+      display: grid;
+      gap: 12px;
+    }
+    .form-section-title {
+      color: var(--dim);
+      font-size: 12px;
+      font-weight: 820;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .checkbox-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .check {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      border: 1px solid var(--border-strong);
+      display: inline-grid;
+      place-items: center;
+      background: white;
+      color: transparent;
+    }
+    .check.active {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: white;
+    }
+    .check.active::before { content: "✓"; font-size: 13px; font-weight: 900; }
+    .thinking-map {
+      display: grid;
+      gap: 12px;
+      max-width: 720px;
+    }
+    .thinking-row {
+      display: grid;
+      grid-template-columns: 88px 178px 178px;
+      gap: 10px;
+      align-items: center;
+    }
+    .thinking-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--muted);
+      font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .thinking-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--dim);
+    }
+    .thinking-dot.low { background: #64a8ff; }
+    .thinking-dot.medium { background: #a78bfa; }
+    .thinking-dot.high { background: #f472b6; }
+    .thinking-dot.xhigh { background: var(--orange); }
+    .mapping-control {
+      height: 36px;
+      border: 1px solid var(--border-strong);
+      border-radius: 9px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: rgba(255,255,255,.62);
+    }
+    .mapping-control.three {
+      grid-template-columns: 1fr 1fr;
+    }
+    .mapping-segment {
+      display: grid;
+      place-items: center;
+      color: var(--dim);
+      border-right: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 720;
+    }
+    .mapping-segment:last-child { border-right: 0; }
+    .mapping-segment.active {
+      background: var(--blue);
+      color: white;
+    }
+    .thinking-map.compact .thinking-row {
+      grid-template-columns: 88px 178px 178px;
+      gap: 10px;
+    }
+    .provider-picker-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .provider-picker-card {
+      min-height: 78px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.72);
+      padding: 12px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 34px;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .provider-picker-card:hover { background: rgba(255,255,255,.95); border-color: var(--border-strong); }
+    .manager-empty {
+      padding: 28px;
+      border: 1px dashed var(--border-strong);
+      border-radius: 16px;
+      background: rgba(255,255,255,.48);
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .selected-outline {
+      outline: 2px solid rgba(0,122,255,.28);
+      background: rgba(0,122,255,.07) !important;
+    }
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      background: rgba(0,0,0,.22);
+      backdrop-filter: blur(8px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+    }
+    .overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 21;
+      height: 100vh;
+      width: min(560px, calc(100vw - 24px));
+      background:
+        radial-gradient(circle at 86% 0%, rgba(0,122,255,.1), transparent 28%),
+        rgba(250,250,252,.94);
+      border-left: 1px solid var(--border);
+      box-shadow: -24px 0 70px rgba(0,0,0,.16);
+      backdrop-filter: var(--blur);
+      transform: translateX(102%);
+      transition: transform .24s cubic-bezier(.2,.8,.2,1);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+	    .drawer.open { transform: translateX(0); }
+	    .drawer.center-modal {
+	      top: 50%;
+	      right: auto;
+	      left: 50%;
+	      width: min(1280px, calc(100vw - 96px));
+	      height: min(760px, calc(100vh - 96px));
+	      border: 1px solid var(--border);
+	      border-radius: 22px;
+	      box-shadow: 0 28px 90px rgba(0,0,0,.24);
+	      transform: translate(-50%, -46%) scale(.98);
+	      overflow: hidden;
+	    }
+	    .drawer.center-modal.open {
+	      transform: translate(-50%, -50%) scale(1);
+	    }
+	    .drawer.center-modal .drawer-head {
+	      padding: 18px 24px;
+	    }
+	    .drawer.center-modal .drawer-desc,
+	    .drawer.center-modal .drawer-kicker {
+	      display: none;
+	    }
+	    .drawer.center-modal .drawer-body {
+	      padding: 24px;
+	    }
+	    .drawer-head {
+      padding: 20px 22px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .drawer-kicker {
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 820;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 7px;
+    }
+    .drawer-title {
+      font-size: 24px;
+      font-weight: 820;
+      letter-spacing: -.035em;
+    }
+    .drawer-desc {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .drawer-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: rgba(118,118,128,.12);
+      color: var(--muted);
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .drawer-body {
+      overflow-y: auto;
+      padding: 18px 22px 24px;
+      display: grid;
+      align-content: start;
+      gap: 14px;
+    }
+    .drawer-foot {
+      border-top: 1px solid var(--border);
+      padding: 14px 22px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      background: rgba(255,255,255,.62);
+    }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 30;
+      transform: translate(-50%, 18px);
+      opacity: 0;
+      pointer-events: none;
+      min-height: 40px;
+      padding: 0 15px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: white;
+      background: rgba(29,29,31,.9);
+      box-shadow: 0 16px 42px rgba(0,0,0,.22);
+      font-size: 13px;
+      font-weight: 720;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+    .toast::before {
+      content: "✓";
+      color: #30d158;
+      font-weight: 900;
+    }
+    .progress-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .progress-step {
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(118,118,128,.18);
+      overflow: hidden;
+    }
+    .progress-step.active { background: var(--blue); }
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .choice-card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.7);
+      padding: 13px;
+      cursor: pointer;
+    }
+    .choice-card.active {
+      outline: 2px solid rgba(0,122,255,.26);
+      background: rgba(0,122,255,.08);
+    }
+    .drawer-code {
+      font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+      background: rgba(29,29,31,.88);
+      color: rgba(255,255,255,.86);
+      border-radius: 14px;
+      padding: 14px;
+      line-height: 1.55;
+      overflow: auto;
+    }
+
+    .app-screen {
+      grid-column: 2;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      display: none;
+    }
+    .app-screen .pill {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.72);
+      color: var(--muted);
+    }
+    .app-screen .pill::before { display: none; }
+    .app-screen.active { display: block; }
+    .settings-shell.app-screen { display: none; }
+    .settings-shell.app-screen.active { display: grid; }
+    .app-scroll {
+      height: calc(100vh - 52px);
+      overflow: auto;
+      padding: 34px 46px;
+    }
+    .app-narrow { max-width: 1040px; margin: 0 auto; }
+    .app-kicker {
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 780;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .app-title {
+      margin: 0;
+      font-size: 32px;
+      line-height: 1.08;
+      font-weight: 800;
+      letter-spacing: -.04em;
+    }
+    .app-copy { margin: 0; color: var(--muted); line-height: 1.55; }
+    .app-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 260px;
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .app-hero-card {
+      min-height: 190px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background:
+        radial-gradient(circle at 92% 18%, rgba(0,122,255,.13), transparent 36%),
+        var(--panel);
+    }
+    .app-actions { display: flex; gap: 10px; margin-top: 24px; }
+    .app-button {
+      min-height: 36px;
+      border-radius: 11px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 740;
+    }
+    .app-stat-stack { display: grid; gap: 14px; }
+    .app-stat { min-height: 92px; padding: 17px; }
+    .app-stat-value {
+      margin: 3px 0 2px;
+      font-size: 26px;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -.03em;
+    }
+    .app-section-head {
+      margin: 30px 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .app-list { overflow: hidden; }
+    .app-row {
+      width: 100%;
+      min-height: 66px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      background: transparent;
+      text-align: left;
+    }
+    .app-row:first-child { border-top: 0; }
+    .app-row-title {
+      display: block;
+      font-size: 14px;
+      font-weight: 720;
+      letter-spacing: -.01em;
+      margin-bottom: 4px;
+    }
+    .app-row-desc {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .chat-screen {
+      height: calc(100vh - 52px);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 26px;
+      background: linear-gradient(90deg, rgba(255,255,255,.1), rgba(0,122,255,.045)), transparent;
+    }
+    .chat-main {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: 52px 1fr auto;
+    }
+    .chat-titlebar {
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.55);
+      backdrop-filter: var(--blur);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+    }
+    .chat-title { font-size: 14px; font-weight: 760; letter-spacing: -.01em; }
+    .chat-actions, .tool-grid, .file-pills, .composer-tools, .preview-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .message-area { overflow: auto; padding: 24px 0 34px; }
+    .message-stack {
+      width: min(760px, calc(100% - 72px));
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+    .msg { display: grid; gap: 6px; }
+    .msg.user { justify-items: end; margin-bottom: 8px; }
+    .bubble {
+      max-width: 690px;
+      padding: 13px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.82);
+      box-shadow: 0 1px 0 rgba(255,255,255,.9) inset;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .user .bubble {
+      max-width: 520px;
+      background: var(--blue);
+      color: white;
+      border-color: rgba(0,122,255,.55);
+      box-shadow: 0 10px 22px rgba(0,122,255,.18);
+    }
+    .msg-meta {
+      color: var(--dim);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .tool-chip, .file-pill {
+      min-height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255,255,255,.72);
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .file-pill {
+      min-height: 34px;
+      border-radius: 11px;
+      color: var(--text);
+    }
+    .file-pill.active {
+      background: var(--selected);
+      color: var(--blue);
+      border-color: rgba(0,122,255,.2);
+    }
+    .composer-wrap {
+      padding: 14px 24px 18px;
+      border-top: 1px solid var(--border);
+      background: rgba(255,255,255,.55);
+      backdrop-filter: var(--blur);
+    }
+    .composer {
+      max-width: 860px;
+      margin: 0 auto;
+      border: 1px solid var(--border-strong);
+      border-radius: 18px;
+      overflow: hidden;
+      background: rgba(255,255,255,.86);
+      box-shadow: var(--shadow-soft);
+    }
+    .composer-input { min-height: 64px; padding: 16px 18px; color: var(--dim); font-size: 14px; }
+    .composer-bar {
+      border-top: 1px solid var(--border);
+      padding: 9px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .minimap {
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .mini-block {
+      width: 5px;
+      height: 42px;
+      border-radius: 999px;
+      background: rgba(118,118,128,.24);
+    }
+    .mini-block.active { background: rgba(0,122,255,.45); }
+    .mini-block.short { height: 24px; }
+    .preview-screen {
+      height: calc(100vh - 52px);
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) minmax(520px, 1.1fr);
+    }
+    .preview-chat {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: 52px 1fr auto;
+      border-right: 1px solid var(--border);
+    }
+    .preview-panel {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: 36px 52px 1fr;
+      background: rgba(255,255,255,.48);
+    }
+    .preview-tabs {
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.64);
+      backdrop-filter: var(--blur);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 14px;
+    }
+    .preview-title {
+      font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .preview-actions button {
+      min-height: 34px;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.78);
+      padding: 0 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .doc-wrap { overflow: auto; padding: 28px; }
+    .doc {
+      max-width: 660px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--panel-solid);
+      box-shadow: var(--shadow);
+      padding: 28px 32px;
+      line-height: 1.65;
+    }
+    .doc h2 { font-size: 26px; margin: 0 0 12px; }
+    .doc table { width: 100%; margin: 18px 0; border-collapse: collapse; font-size: 13px; }
+    .doc th, .doc td { border: 1px solid var(--border); padding: 9px 10px; text-align: left; }
+    .doc code {
+      border-radius: 7px;
+      background: rgba(52,199,89,.12);
+      color: #128345;
+      padding: 2px 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+    }
+    .new-center {
+      height: calc(100vh - 52px);
+      display: grid;
+      place-items: center;
+      padding: 34px;
+    }
+    .new-card { width: min(920px, 100%); overflow: hidden; border-radius: 20px; }
+    .new-head { padding: 28px 30px 18px; }
+    .prompt-box {
+      margin: 0 20px 16px;
+      min-height: 160px;
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      background: rgba(255,255,255,.75);
+      padding: 18px;
+      color: var(--dim);
+      font-size: 14px;
+    }
+    .suggestions {
+      padding: 0 20px 20px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .suggestion {
+      min-height: 88px;
+      padding: 13px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.6);
+      text-align: left;
+    }
+    .new-foot {
+      border-top: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: rgba(255,255,255,.54);
+    }
+    .history-tools {
+      margin: 20px 0 12px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 10px;
+    }
+    .search-box {
+      min-height: 40px;
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      background: rgba(255,255,255,.72);
+      color: var(--dim);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 13px;
+    }
+    .resource-tree {
+      display: grid;
+      gap: 2px;
+      margin-top: 3px;
+    }
+    .side-section {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0 6px;
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 760;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .resource-row {
+      min-height: 30px;
+      border-radius: 9px;
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      color: var(--text);
+      font-size: 12px;
+    }
+    .resource-row.active {
+      background: var(--selected);
+      color: var(--blue);
+      font-weight: 760;
+    }
+    .resource-main {
+      min-width: 0;
+      display: grid;
+      gap: 1px;
+    }
+    .resource-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 680;
+    }
+    .resource-meta {
+      color: var(--dim);
+      font-size: 10px;
+      font-weight: 520;
+    }
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .module-card {
+      min-height: 144px;
+      padding: 16px;
+      display: grid;
+      align-content: space-between;
+      gap: 14px;
+    }
+    .module-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .module-card-title {
+      font-size: 15px;
+      font-weight: 780;
+      letter-spacing: -.02em;
+    }
+    .module-card-desc {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .module-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 11px;
+      background: linear-gradient(135deg, var(--blue), #64d2ff);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-weight: 840;
+      box-shadow: 0 12px 24px rgba(0,122,255,.16);
+      flex: 0 0 auto;
+    }
+    .module-icon.green { background: linear-gradient(135deg, var(--green), #64d2ff); }
+    .module-icon.orange { background: linear-gradient(135deg, var(--orange), #ffd60a); }
+    .module-icon.purple { background: linear-gradient(135deg, var(--purple), var(--blue)); }
+    .module-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+    .mini-action {
+      min-height: 26px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.72);
+      padding: 0 9px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 720;
+    }
+    .detail-drawer {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
+      gap: 12px;
+    }
+    .detail-card {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .meta-cell {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255,255,255,.56);
+      padding: 11px;
+    }
+    .meta-label {
+      color: var(--dim);
+      font-size: 10px;
+      font-weight: 780;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .meta-value {
+      margin-top: 5px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 720;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tab-strip {
+      height: 36px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(250,250,252,.72);
+      display: flex;
+      align-items: flex-end;
+      overflow-x: auto;
+    }
+    .file-tab {
+      height: 36px;
+      min-width: 120px;
+      max-width: 190px;
+      border-right: 1px solid var(--border);
+      background: rgba(255,255,255,.46);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 8px 0 12px;
+      color: var(--muted);
+      font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .file-tab.active {
+      background: rgba(255,255,255,.88);
+      color: var(--text);
+    }
+    .tab-close {
+      margin-left: auto;
+      color: var(--dim);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    }
+    .top-popovers {
+      position: absolute;
+      top: 56px;
+      right: 52px;
+      z-index: 20;
+      display: grid;
+      gap: 10px;
+      width: 330px;
+    }
+    .floating-panel {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(255,255,255,.86);
+      backdrop-filter: var(--blur);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: -.01em;
+    }
+    .branch-line {
+      min-height: 24px;
+      display: grid;
+      grid-template-columns: 16px 18px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .branch-line.active { color: var(--blue); font-weight: 760; }
+    .branch-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+    .tool-preset {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      border-radius: 10px;
+      background: rgba(118,118,128,.12);
+      padding: 4px;
+    }
+    .tool-preset button {
+      min-height: 28px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+    .tool-preset button.active {
+      background: rgba(255,255,255,.9);
+      color: var(--blue);
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .attach-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      padding: 0 18px 10px;
+    }
+    .slash-menu {
+      position: absolute;
+      left: 32px;
+      bottom: 112px;
+      width: 300px;
+      z-index: 15;
+    }
+    .slash-row {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      border-radius: 10px;
+      padding: 0 9px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .slash-row.active {
+      background: var(--selected);
+      color: var(--blue);
+      font-weight: 760;
+    }
+    .send-state {
+      border: 1px solid rgba(255,149,0,.25);
+      background: rgba(255,149,0,.08);
+      color: #b76500;
+      border-radius: 11px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 680;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .share-export-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .share-export-row button {
+      min-height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.72);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    @media (max-width: 980px) {
+      :root { --sidebar-w: 0px; --settings-nav-w: 214px; }
+      .app-sidebar { display: none; }
+      .topbar, .settings-shell, .app-screen { grid-column: 1 / 3; }
+      .grid.two, .grid.three { grid-template-columns: 1fr; }
+      .hero-panel, .app-hero, .module-grid, .detail-drawer, .preview-screen, .history-tools, .security-strip, .skill-grid, .split-workspace, .step-flow, .provider-grid, .form-grid, .management-body, .provider-picker-grid { grid-template-columns: 1fr; }
+      .preview-chat { display: none; }
+      .content { padding: 28px 24px 70px; }
+      .app-scroll { padding: 28px 24px 70px; }
+      .suggestions { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="app-sidebar">
+      <div class="brand">
+        <div class="brand-title">Pi Agent Web</div>
+        <button class="new-btn primary" data-app-target="app-new">＋ 新建</button>
+      </div>
+      <div class="workspace">~/pi-cwd-20260603</div>
+      <div class="sessions">
+        <div class="session active" data-app-target="app-chat" data-active-when="app-chat"><div class="session-title">本地 claude</div><div class="session-meta">2 小时前 · 139 条消息</div></div>
+        <div class="session" data-app-target="app-chat"><div class="session-title">总结下 pi-web 项目</div><div class="session-meta">15 小时前 · 115 条消息</div></div>
+        <div class="session" data-app-target="app-chat"><div class="session-title">你有哪些 自带技能</div><div class="session-meta">17 小时前 · 225 条消息</div></div>
+        <div class="session" data-app-target="app-chat"><div class="session-title">把下载文件夹中的简历总结下</div><div class="session-meta">1 天前 · 102 条消息</div></div>
+        <div class="side-section" style="margin-top:14px">资源管理器 <span>↻</span></div>
+        <div class="resource-tree">
+          <div class="resource-row"><span>▸</span><span class="resource-main"><span class="resource-name">docs</span><span class="resource-meta">folder</span></span><span>⌁</span></div>
+          <div class="resource-row"><span>▸</span><span class="resource-main"><span class="resource-name">components</span><span class="resource-meta">folder</span></span><span>⌁</span></div>
+          <div class="resource-row"><span>▸</span><span class="resource-main"><span class="resource-name">app/api</span><span class="resource-meta">folder</span></span><span>⌁</span></div>
+          <div class="resource-row active" data-app-target="app-file" data-active-when="app-file"><span>◇</span><span class="resource-main"><span class="resource-name">weekly-digest-2026-06-03.md</span><span class="resource-meta">markdown · 可预览</span></span><span>@</span></div>
+          <div class="resource-row"><span>◇</span><span class="resource-main"><span class="resource-name">README.md</span><span class="resource-meta">markdown · 可预览</span></span><span>@</span></div>
+        </div>
+      </div>
+      <div class="side-bottom">
+        <button class="side-tab active" data-app-target="app-home">⌂ 首页</button>
+        <button class="side-tab" data-app-target="app-history">⌘ 全部工作</button>
+        <button class="side-tab" data-app-target="app-modules">▦ 功能总览</button>
+        <button class="side-tab" data-app-target="app-settings">⚙︎ 设置</button>
+      </div>
+    </aside>
+
+    <header class="topbar">
+      <div id="appCrumb">首页</div>
+      <div><span class="usage-pill">↑215k · ↓15k · $1.88</span> <button class="ghost" data-app-target="app-file">显示文件面板</button></div>
+    </header>
+
+    <main class="app-screen active" id="app-home">
+      <div class="app-scroll">
+        <div class="app-narrow">
+          <div class="app-kicker">Workspace</div>
+          <h1 class="app-title">Pi 工作台</h1>
+          <div class="app-hero">
+            <section class="card app-hero-card">
+              <p class="app-copy">首页只做两件事：开始新对话，回到最近工作。项目、文件和设置保持在左侧与底部，不打断主流程。</p>
+              <div class="app-actions">
+                <button class="app-button primary" data-app-target="app-new">新建对话</button>
+                <button class="app-button secondary" data-app-target="app-history">查看全部历史</button>
+              </div>
+            </section>
+            <div class="app-stat-stack">
+              <section class="card app-stat"><div class="app-kicker">当前项目</div><div class="app-stat-value">pi-cwd</div><p class="app-copy">~/pi-cwd-20260603</p></section>
+              <section class="card app-stat"><div class="app-kicker">今天</div><div class="app-stat-value">3</div><p class="app-copy">活跃对话 · 1 个文件打开</p></section>
+            </div>
+          </div>
+          <div class="app-section-head"><h2>我的工作</h2><button class="ghost" data-app-target="app-history">查看全部</button></div>
+          <section class="card app-list">
+            <button class="app-row" data-app-target="app-chat"><span><span class="app-row-title">本地 claude</span><span class="app-row-desc">本地 claude cli 使用不了，帮忙检查修改为可以</span></span><span class="status-chip">进行中</span><span class="pill">2026/6/5</span></button>
+            <button class="app-row"><span><span class="app-row-title">总结下 pi-web 项目</span><span class="app-row-desc">梳理项目结构、模块和开发注意事项</span></span><span class="status-chip gray">完成</span><span class="pill">2026/6/4</span></button>
+            <button class="app-row"><span><span class="app-row-title">你有哪些 自带技能</span><span class="app-row-desc">查看系统中可用 skills 与使用方式</span></span><span class="status-chip gray">完成</span><span class="pill">2026/6/4</span></button>
+          </section>
+          <div class="app-section-head"><h2>功能模块地图</h2><button class="ghost" data-app-target="app-modules">查看完整模块</button></div>
+          <section class="module-grid">
+            <article class="card module-card">
+              <div class="module-card-top"><div><div class="module-card-title">项目与工作区</div><div class="module-card-desc">默认目录、自定义路径、Git 分支、项目内历史统一入口。</div></div><div class="module-icon">⌂</div></div>
+              <div class="module-actions"><span class="mini-action">cwd picker</span><span class="mini-action">git branch</span><span class="mini-action">default cwd</span></div>
+            </article>
+            <article class="card module-card">
+              <div class="module-card-top"><div><div class="module-card-title">会话树与分支</div><div class="module-card-desc">Fork、Continue、navigate_tree、分支摘要和当前路径。</div></div><div class="module-icon purple">⑂</div></div>
+              <div class="module-actions"><span class="mini-action">branch panel</span><span class="mini-action">fork</span><span class="mini-action">compact</span></div>
+            </article>
+            <article class="card module-card">
+              <div class="module-card-top"><div><div class="module-card-title">文件与预览</div><div class="module-card-desc">左侧资源树、右侧多标签、Markdown/HTML 导出为图片。</div></div><div class="module-icon green">◇</div></div>
+              <div class="module-actions"><span class="mini-action">file tabs</span><span class="mini-action">image export</span><span class="mini-action">@ mention</span></div>
+            </article>
+            <article class="card module-card">
+              <div class="module-card-top"><div><div class="module-card-title">输入与工具</div><div class="module-card-desc">模型切换、thinking、工具预设、附件、斜杠菜单、steer/follow-up。</div></div><div class="module-icon orange">⌘</div></div>
+              <div class="module-actions"><span class="mini-action">models</span><span class="mini-action">tools</span><span class="mini-action">attachments</span></div>
+            </article>
+            <article class="card module-card">
+              <div class="module-card-top"><div><div class="module-card-title">分享与导出</div><div class="module-card-desc">公开分享只读脱敏，HTML 导出，远程只读访问。</div></div><div class="module-icon">⇄</div></div>
+              <div class="module-actions"><span class="mini-action">share link</span><span class="mini-action">export html</span><span class="mini-action">remote</span></div>
+            </article>
+            <article class="card module-card">
+              <div class="module-card-top"><div><div class="module-card-title">扩展与场景包</div><div class="module-card-desc">Extensions、Scene packs、Push notifications、诊断与审计。</div></div><div class="module-icon purple">✦</div></div>
+              <div class="module-actions"><span class="mini-action">extensions</span><span class="mini-action">scene pack</span><span class="mini-action">audit</span></div>
+            </article>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <main class="app-screen" id="app-chat">
+      <div class="chat-screen">
+        <section class="chat-main">
+          <div class="chat-titlebar">
+            <div class="chat-title">本地 claude cli 使用不了，帮忙检查修改为可以</div>
+            <div class="chat-actions"><button class="secondary">分支 · main</button><button class="secondary">系统</button><span class="usage-pill">↑215k · ↓15k · $1.88</span><button class="ghost">⋯</button></div>
+          </div>
+          <div class="top-popovers">
+            <section class="floating-panel">
+              <div class="panel-title">会话分支 / Git</div>
+              <div class="branch-line active"><span></span><span class="branch-dot"></span><span>main · 当前路径</span><span>6 turns</span></div>
+              <div class="branch-line"><span>│</span><span class="branch-dot"></span><span>从“修改配置”fork</span><span>3 turns</span></div>
+              <div class="branch-line"><span>└</span><span class="branch-dot"></span><span>另开一版：保守修复</span><span>2 turns</span></div>
+              <div class="share-export-row"><button>切换</button><button>Fork</button><button>压缩摘要</button></div>
+            </section>
+            <section class="floating-panel">
+              <div class="panel-title">系统提示词 / 当前能力</div>
+              <div class="app-row-desc">技能工作流、工具白名单、当前 cwd、模型 thinking 映射会在这里汇总，避免用户猜 agent 当前状态。</div>
+              <div class="share-export-row"><button>查看全文</button><button>复制</button><button>刷新</button></div>
+            </section>
+          </div>
+          <div class="message-area">
+            <div class="message-stack">
+              <div class="msg user"><div class="bubble">本地 claude cli 使用不了，帮忙检查修改为可以</div><div class="msg-meta">你 · 08:15 · 从这里编辑 · 另开一版</div></div>
+              <div class="msg"><div class="msg-meta">GPT-5.5 · 08:16</div><div class="bubble">我先做一次系统化排查：确认命令位置、Node 环境、Claude 配置与网络请求，再给出最小修复。</div></div>
+              <div class="tool-grid"><div class="tool-chip">read /Users/mk/.agents/skills/investigate… 4s</div><div class="tool-chip">bash claude --version && claude doctor 67s</div><div class="tool-chip">bash grep -R "ANTHROPIC_BASE_URL" ~/.claude 17s</div></div>
+              <div class="msg"><div class="msg-meta">GPT-5.5 · 输入 3,210 · 输出 482 · $0.0390</div><div class="bubble">定位结果：本地 CLI 配置指向了不可达的 API Host，且 shell 环境里仍有旧变量。建议只改用户级配置，不动项目文件。</div></div>
+              <div class="file-pills"><button class="file-pill">◇ m1-design.md</button><button class="file-pill">◇ m2-checklist.md</button><button class="file-pill" data-app-target="app-file">◇ README.md</button><button class="file-pill">◇ product-principles.md</button></div>
+              <div class="msg"><div class="msg-meta">GPT-5.5 · 12:22</div><div class="bubble">已清理过期文档并保留 README / product-principles 的索引关系。文件输出可以直接点击在右侧预览。</div></div>
+              <section class="floating-panel" style="position:relative;box-shadow:var(--shadow-soft)">
+                <div class="panel-title">分享 / 导出</div>
+                <div class="app-row-desc">分享视图保留公开只读语义，但不泄露 cwd、toolCall、toolResult、内部路径和私有元数据。</div>
+                <div class="share-export-row"><button>生成分享链接</button><button>导出 HTML</button><button>复制报告</button></div>
+              </section>
+            </div>
+          </div>
+          <div class="composer-wrap">
+            <div class="composer" style="position:relative">
+              <div class="slash-menu floating-panel">
+                <div class="panel-title">斜杠菜单</div>
+                <div class="slash-row active"><span>/compact</span><span>压缩当前上下文</span></div>
+                <div class="slash-row"><span>/share</span><span>生成只读分享链接</span></div>
+                <div class="slash-row"><span>/export</span><span>导出当前会话 HTML</span></div>
+              </div>
+              <div class="composer-input">发送消息... 输入 / 查看命令，拖入文件会先 stage 再作为附件发送。</div>
+              <div class="attach-strip"><span class="file-pill">◇ prompt-notes.md ×</span><span class="file-pill">▧ screenshot.png ×</span><span class="status-chip orange">Steer mode：可追加约束</span></div>
+              <div class="send-state"><span>自动重试 2/3：网络抖动后会恢复 SSE</span><button class="ghost">停止</button></div>
+              <div class="composer-bar">
+                <div class="composer-tools"><span class="pill">DeepSeek V4 Pro</span><span class="pill">thinking: high</span><span class="pill">default tools</span><span class="pill">声音</span><span class="pill">克隆</span><span class="pill">分享</span><span class="pill">压缩</span></div>
+                <div class="floating-panel" style="position:absolute;right:18px;bottom:60px;width:280px">
+                  <div class="panel-title">工具预设</div>
+                  <div class="tool-preset"><button>Off</button><button class="active">Low</button><button>High</button></div>
+                  <div class="app-row-desc">Low: read · bash · edit · write；High 额外启用 grep · find · ls。下轮生效。</div>
+                </div>
+                <button class="primary">发送 →</button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <aside class="minimap"><span class="mini-block short"></span><span class="mini-block active"></span><span class="mini-block short"></span><span class="mini-block"></span><span class="mini-block short"></span></aside>
+      </div>
+    </main>
+
+    <main class="app-screen" id="app-file">
+      <div class="preview-screen">
+        <section class="preview-chat">
+          <div class="chat-titlebar"><div class="chat-title">文件输出已打开预览</div><button class="ghost" data-app-target="app-chat">隐藏文件面板</button></div>
+          <div class="message-area"><div class="message-stack"><div class="msg"><div class="msg-meta">GPT-5.5</div><div class="bubble">已生成周报摘要，并输出 Markdown 文件。</div></div><div class="file-pills"><button class="file-pill active">◇ weekly-digest-2026-06-03.md</button><button class="file-pill">◇ README.md</button></div><div class="msg user"><div class="bubble">打开第一个文件预览</div></div></div></div>
+          <div class="composer-wrap"><div class="composer"><div class="composer-input">继续追问这个文件...</div><div class="composer-bar"><div class="composer-tools"><span class="pill">带入当前文件</span><span class="pill">DeepSeek V4 Pro</span></div><button class="secondary">发送</button></div></div></div>
+        </section>
+        <aside class="preview-panel">
+          <div class="tab-strip">
+            <div class="file-tab active">◇ weekly-digest… <span class="tab-close">×</span></div>
+            <div class="file-tab">◇ README.md <span class="tab-close">×</span></div>
+            <div class="file-tab">▧ screenshot.png <span class="tab-close">×</span></div>
+            <div class="file-tab">PDF report <span class="tab-close">×</span></div>
+          </div>
+          <div class="preview-tabs"><div class="preview-title">◇ weekly-digest-2026-06-03.md</div><div class="preview-actions"><button>复制为图片</button><button>保存为图片</button><button class="ghost">×</button></div></div>
+          <div class="doc-wrap">
+            <div class="send-state" style="margin:0 auto 14px;max-width:660px"><span>Markdown / HTML 支持复制或保存为图片；PDF、图片、音频走对应 viewer。</span><button class="ghost">了解</button></div>
+            <article class="doc"><h2>Weekly Report Digest</h2><p>本周工作集中在 pi-web 设置页、文件预览和开发/生产隔离，关键风险已收敛到可验证范围。</p><table><tr><th>模块</th><th>状态</th><th>下一步</th></tr><tr><td>模型配置</td><td>✅ 已更新</td><td>补 thinking level 映射</td></tr><tr><td>技能管理</td><td>✅ 已对齐</td><td>保持极简详情页</td></tr><tr><td>文件预览</td><td>✅ 已可点击</td><td>图片导出增强</td></tr></table><p>相关文件：<code>README.md</code>、<code>product-principles.md</code>、<code>docs/prototypes/</code></p></article>
+            <section class="detail-drawer">
+              <article class="card detail-card">
+                <div class="panel-title">预览能力</div>
+                <div class="meta-grid">
+                  <div class="meta-cell"><div class="meta-label">Text</div><div class="meta-value">md · html · ts · json</div></div>
+                  <div class="meta-cell"><div class="meta-label">Media</div><div class="meta-value">image · audio</div></div>
+                  <div class="meta-cell"><div class="meta-label">Document</div><div class="meta-value">pdf · word · excel</div></div>
+                  <div class="meta-cell"><div class="meta-label">Fallback</div><div class="meta-value">系统 App 打开</div></div>
+                </div>
+              </article>
+              <article class="card detail-card">
+                <div class="panel-title">文件操作</div>
+                <button class="app-button secondary">复制路径</button>
+                <button class="app-button secondary">插入到输入框 @mention</button>
+                <button class="app-button primary">用系统 App 打开</button>
+              </article>
+            </section>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <main class="app-screen" id="app-new">
+      <div class="new-center">
+        <section class="card new-card">
+          <div class="new-head"><div class="app-kicker">New Session</div><h1 class="app-title">先说要做什么，配置留在底部</h1><p class="app-copy">保留一个主输入框；模型、工具、项目目录作为辅助选择，不抢用户注意力。</p></div>
+          <div class="prompt-box">例如：审查 pi-web 的文件预览模块，优先找正确性和安全风险...</div>
+          <div class="suggestions"><button class="suggestion"><span class="app-row-title">审查代码</span><span class="app-row-desc">定位风险、给出补丁和测试计划。</span></button><button class="suggestion"><span class="app-row-title">整理项目</span><span class="app-row-desc">生成 README、架构图或模块清单。</span></button><button class="suggestion"><span class="app-row-title">处理文件</span><span class="app-row-desc">总结、转换、预览或导出文件。</span></button></div>
+          <div class="new-foot"><div class="composer-tools"><span class="pill">~/pi-cwd-20260603</span><span class="pill">DeepSeek V4 Pro</span><span class="pill">工具：default</span><span class="pill">thinking：high</span></div><button class="primary">开始 →</button></div>
+        </section>
+      </div>
+    </main>
+
+    <main class="app-screen" id="app-history">
+      <div class="app-scroll">
+        <div class="app-narrow">
+          <div class="app-kicker">All Work</div>
+          <h1 class="app-title">用搜索和分组找回上下文</h1>
+          <p class="app-copy">历史页不重复首页：它专注查找、筛选、批量管理和恢复工作流。</p>
+          <div class="history-tools"><div class="search-box">搜索标题、消息、文件路径...</div><button class="app-button secondary">最近 30 天</button><button class="app-button secondary">仅进行中</button></div>
+          <section class="card app-list">
+            <button class="app-row" data-app-target="app-chat"><span><span class="app-row-title">本地 claude</span><span class="app-row-desc">139 条消息 · GPT-5.5 · $1.88 · ~/pi-cwd-20260603</span></span><span class="status-chip">进行中</span><span class="pill">今天</span></button>
+            <button class="app-row"><span><span class="app-row-title">总结下 pi-web 项目</span><span class="app-row-desc">115 条消息 · 含文件预览输出 · 15 小时前</span></span><span class="status-chip gray">完成</span><span class="pill">昨天</span></button>
+            <button class="app-row"><span><span class="app-row-title">你有哪些 自带技能</span><span class="app-row-desc">225 条消息 · skills / models / settings</span></span><span class="status-chip gray">完成</span><span class="pill">昨天</span></button>
+          </section>
+          <section class="detail-drawer">
+            <article class="card detail-card">
+              <div class="panel-title">历史详情</div>
+              <div>
+                <div class="app-row-title">本地 claude cli 使用不了，帮忙检查修改为可以</div>
+                <div class="app-row-desc">最新结果摘要：定位到本地 CLI 配置指向不可达 API Host，并给出用户级修复方案。</div>
+              </div>
+              <div class="meta-grid">
+                <div class="meta-cell"><div class="meta-label">Status</div><div class="meta-value">active</div></div>
+                <div class="meta-cell"><div class="meta-label">Messages</div><div class="meta-value">139</div></div>
+                <div class="meta-cell"><div class="meta-label">Started</div><div class="meta-value">2026/6/5 08:15</div></div>
+                <div class="meta-cell"><div class="meta-label">Updated</div><div class="meta-value">2026/6/5 12:22</div></div>
+              </div>
+            </article>
+            <article class="card detail-card">
+              <div class="panel-title">上下文定位</div>
+              <div class="meta-cell"><div class="meta-label">Working directory</div><div class="meta-value">~/pi-cwd-20260603</div></div>
+              <div class="meta-cell"><div class="meta-label">Session file</div><div class="meta-value">sessions/pi-cwd/20260605_uuid.jsonl</div></div>
+              <button class="app-button primary" data-app-target="app-chat">打开对话</button>
+            </article>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <main class="app-screen" id="app-modules">
+      <div class="app-scroll">
+        <div class="app-narrow">
+          <div class="app-kicker">System Coverage</div>
+          <h1 class="app-title">系统功能总览</h1>
+          <p class="app-copy">按真实 `30142` 页面和代码模块补齐产品原型：每个大功能都要能在原型里找到入口、状态和下一步操作。</p>
+
+          <div class="app-section-head"><h2>工作台与项目</h2><button class="ghost" data-app-target="app-home">回首页</button></div>
+          <section class="module-grid">
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">项目选择器</div><div class="module-card-desc">选择默认 cwd、自定义路径、恢复上次项目；未选择项目时新建按钮给出明确原因。</div></div><div class="module-icon">⌂</div></div><div class="module-actions"><span class="mini-action">default cwd</span><span class="mini-action">custom path</span><span class="mini-action">validate cwd</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">最近对话树</div><div class="module-card-desc">按项目过滤会话，支持 orphaned 提示、重命名、删除、父子 fork 展示。</div></div><div class="module-icon purple">⑂</div></div><div class="module-actions"><span class="mini-action">rename</span><span class="mini-action">delete</span><span class="mini-action">fork tree</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">工作台历史</div><div class="module-card-desc">首页只展示最近工作；全部工作支持搜索、筛选、详情抽屉和打开原会话。</div></div><div class="module-icon green">⌘</div></div><div class="module-actions"><span class="mini-action">history</span><span class="mini-action">details</span><span class="mini-action">open chat</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">近期活动</div><div class="module-card-desc">真实设置页包含近 7 日新建/完成/进行中趋势，帮助判断系统是否在工作。</div></div><div class="module-icon orange">↗</div></div><div class="module-actions"><span class="mini-action">usage chart</span><span class="mini-action">active</span><span class="mini-action">completed</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">服务连接状态</div><div class="module-card-desc">ServerConnectionBanner / RemoteAccessBanner 应以顶部轻提示出现，不打断工作。</div></div><div class="module-icon">●</div></div><div class="module-actions"><span class="mini-action">server</span><span class="mini-action">remote</span><span class="mini-action">health</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">Git 分支</div><div class="module-card-desc">当前 cwd 是 Git 仓库时，顶部显示分支并和会话分支区分。</div></div><div class="module-icon purple">git</div></div><div class="module-actions"><span class="mini-action">branch</span><span class="mini-action">cwd bound</span><span class="mini-action">read only</span></div></article>
+          </section>
+
+          <div class="app-section-head"><h2>对话与 Agent 生命周期</h2><button class="ghost" data-app-target="app-chat">看对话原型</button></div>
+          <section class="module-grid">
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">消息流</div><div class="module-card-desc">用户/助手/工具调用/工具结果/compaction summary 统一渲染，复制按钮常驻在消息块。</div></div><div class="module-icon">M</div></div><div class="module-actions"><span class="mini-action">copy</span><span class="mini-action">thinking</span><span class="mini-action">tool result</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">分支导航</div><div class="module-card-desc">Fork 会创建新 session；Continue/navigate_tree 在同一文件内切换叶子，必须在原型里区分。</div></div><div class="module-icon purple">⑂</div></div><div class="module-actions"><span class="mini-action">fork</span><span class="mini-action">navigate</span><span class="mini-action">leaf</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">SSE 恢复</div><div class="module-card-desc">刷新中途、重试、停止、agent end 通知需要明确状态，而不是只有加载 spinner。</div></div><div class="module-icon orange">S</div></div><div class="module-actions"><span class="mini-action">streaming</span><span class="mini-action">retry</span><span class="mini-action">stop</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">压缩上下文</div><div class="module-card-desc">手动 compact、自动 compact、取消/错误反馈都在输入区附近展示。</div></div><div class="module-icon green">C</div></div><div class="module-actions"><span class="mini-action">manual</span><span class="mini-action">auto</span><span class="mini-action">summary</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">用量报告</div><div class="module-card-desc">顶部显示 token/cost 摘要，点击后可看上下文窗口、缓存读写和单次会话统计。</div></div><div class="module-icon">↕</div></div><div class="module-actions"><span class="mini-action">tokens</span><span class="mini-action">cost</span><span class="mini-action">context</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">系统提示词</div><div class="module-card-desc">当前 skills、tools、cwd、模型能力汇总为可查看状态，避免用户猜 Agent 当前能力。</div></div><div class="module-icon purple">Σ</div></div><div class="module-actions"><span class="mini-action">system</span><span class="mini-action">skills</span><span class="mini-action">resource loader</span></div></article>
+          </section>
+
+          <div class="app-section-head"><h2>输入、文件与分享</h2><button class="ghost" data-app-target="app-file">看文件预览</button></div>
+          <section class="module-grid">
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">模型 / Thinking</div><div class="module-card-desc">输入区可切模型、thinking level；模型详情页维护 thinking 映射和图片输入能力。</div></div><div class="module-icon">AI</div></div><div class="module-actions"><span class="mini-action">model</span><span class="mini-action">thinking</span><span class="mini-action">image input</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">工具预设</div><div class="module-card-desc">Off / Low / High 对应 none/default/full，下一轮生效，和设置里的默认工具模式一致。</div></div><div class="module-icon orange">T</div></div><div class="module-actions"><span class="mini-action">off</span><span class="mini-action">low</span><span class="mini-action">high</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">附件与 Stage</div><div class="module-card-desc">图片、普通文件、浏览器上传会先 stage，再以文件 chip 进入输入框和消息上下文。</div></div><div class="module-icon green">＋</div></div><div class="module-actions"><span class="mini-action">image</span><span class="mini-action">file</span><span class="mini-action">stage</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">斜杠菜单</div><div class="module-card-desc">/compact、/share、/export 等命令在输入时可发现，不藏在更多菜单里。</div></div><div class="module-icon purple">/</div></div><div class="module-actions"><span class="mini-action">slash</span><span class="mini-action">commands</span><span class="mini-action">discover</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">文件标签与 Viewer</div><div class="module-card-desc">右侧多标签支持文本、Markdown、HTML、图片、音频、PDF、Office 和系统打开 fallback。</div></div><div class="module-icon">◇</div></div><div class="module-actions"><span class="mini-action">tabs</span><span class="mini-action">preview</span><span class="mini-action">fallback</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">分享 / 导出</div><div class="module-card-desc">会话分享必须脱敏；HTML 导出和 Markdown/HTML 复制为图片属于不同出口。</div></div><div class="module-icon green">⇪</div></div><div class="module-actions"><span class="mini-action">share</span><span class="mini-action">html</span><span class="mini-action">image export</span></div></article>
+          </section>
+
+          <div class="app-section-head"><h2>设置、安全与扩展</h2><button class="ghost" data-app-target="app-settings">进入设置</button></div>
+          <section class="module-grid">
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">模型管理</div><div class="module-card-desc">默认模型、Provider、API Key、API 覆盖、成本、测试、删除和添加 provider/model。</div></div><div class="module-icon">M</div></div><div class="module-actions"><span class="mini-action">provider</span><span class="mini-action">models.json</span><span class="mini-action">test</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">技能管理</div><div class="module-card-desc">全局/项目技能、启用状态、添加技能搜索、skills.sh 安装提示和详情描述。</div></div><div class="module-icon purple">S</div></div><div class="module-actions"><span class="mini-action">global</span><span class="mini-action">project</span><span class="mini-action">install</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">远程访问</div><div class="module-card-desc">开启/关闭、配对设备、只读限制、relay offer、会话撤销和审计日志。</div></div><div class="module-icon green">⇄</div></div><div class="module-actions"><span class="mini-action">pair</span><span class="mini-action">read only</span><span class="mini-action">audit</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">扩展</div><div class="module-card-desc">真实设置页已有扩展只读列表、重试、文档链接；原型保留为空状态和错误状态。</div></div><div class="module-icon orange">E</div></div><div class="module-actions"><span class="mini-action">extensions</span><span class="mini-action">retry</span><span class="mini-action">docs</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">场景包</div><div class="module-card-desc">导出/导入 scene override JSON，用于换机或团队搬运。</div></div><div class="module-icon">P</div></div><div class="module-actions"><span class="mini-action">export</span><span class="mini-action">import</span><span class="mini-action">preview</span></div></article>
+            <article class="card module-card"><div class="module-card-top"><div><div class="module-card-title">通知与版本</div><div class="module-card-desc">Web Push、agent-end 通知、pi-web / pi-coding-agent 版本和诊断入口。</div></div><div class="module-icon purple">i</div></div><div class="module-actions"><span class="mini-action">push</span><span class="mini-action">versions</span><span class="mini-action">diagnostics</span></div></article>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <main class="settings-shell app-screen" id="app-settings">
+      <nav class="settings-nav" aria-label="Settings sections">
+        <div class="settings-kicker">Platform</div>
+        <div class="settings-title">Settings</div>
+
+        <div class="nav-group">
+          <div class="nav-label">Start here</div>
+          <button class="nav-item active" data-target="overview"><span class="nav-icon">⌘</span><span class="nav-text">Overview</span><span class="nav-badge"></span></button>
+          <button class="nav-item" data-target="general"><span class="nav-icon">Aa</span><span class="nav-text">General</span></button>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-label">Agent</div>
+          <button class="nav-item" data-target="agent"><span class="nav-icon">◈</span><span class="nav-text">Agent Overview</span></button>
+          <button class="nav-item" data-target="models"><span class="nav-icon">M</span><span class="nav-text">Models</span></button>
+          <button class="nav-item" data-target="skills"><span class="nav-icon">S</span><span class="nav-text">Skills</span></button>
+          <button class="nav-item" data-target="remote"><span class="nav-icon">⇄</span><span class="nav-text">Remote & Security</span><span class="nav-badge"></span></button>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-label">Developer</div>
+          <button class="nav-item" data-target="advanced"><span class="nav-icon">⌥</span><span class="nav-text">Advanced</span></button>
+          <button class="nav-item" data-target="about"><span class="nav-icon">i</span><span class="nav-text">About & Diagnostics</span></button>
+        </div>
+      </nav>
+
+      <section class="content">
+        <section class="page active" id="overview">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">Overview</h1>
+              <p class="page-desc">把设置页从“所有信息一次性铺开”改成“当前状态 + 下一步操作”。默认首屏只回答：现在配置如何？我还能做什么？</p>
+            </div>
+            <div class="pill">Ready</div>
+          </div>
+
+          <div class="grid two">
+            <article class="card summary-card" data-jump="general">
+              <div class="summary-top"><div class="summary-title">Language</div><div class="summary-icon blue">Aa</div></div>
+              <div><div class="summary-value">简体中文</div><div class="summary-desc">界面语言，属于个人偏好，不混入高级设置。</div></div>
+              <div class="card-action">Change language →</div>
+            </article>
+            <article class="card summary-card" data-jump="agent">
+              <div class="summary-top"><div class="summary-title">Default model</div><div class="summary-icon purple">M</div></div>
+              <div><div class="summary-value">zenmux · claude-sonnet-4-6</div><div class="summary-desc">模型、Provider、Skills 汇总到 Agent 分区。</div></div>
+              <div class="card-action">Manage agent settings →</div>
+            </article>
+            <article class="card summary-card" data-jump="remote">
+              <div class="summary-top"><div class="summary-title">Remote access</div><div class="summary-icon green">⇄</div></div>
+              <div><div class="summary-value">Enabled · 2 paired devices</div><div class="summary-desc">高风险入口单独成页，默认展示安全状态。</div></div>
+              <div class="card-action">Review security →</div>
+            </article>
+            <article class="card summary-card" data-jump="advanced">
+              <div class="summary-top"><div class="summary-title">Advanced tools</div><div class="summary-icon orange">⌥</div></div>
+              <div><div class="summary-value">Extensions · Scene packs · Audit</div><div class="summary-desc">技术项不再挤占普通用户首屏。</div></div>
+              <div class="card-action">Open advanced →</div>
+            </article>
+          </div>
+
+          <div class="section-title">Recommended next actions</div>
+          <div class="card setting-list">
+            <div class="setting-row">
+              <div><div class="setting-name">Pair a phone for read-only review</div><div class="setting-help">远程能力开启时，主操作优先是配对设备，而不是展示命令和日志。</div></div>
+              <button class="primary">Pair Device</button>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-name">Confirm default model</div><div class="setting-help">把“模型是否配置正确”变成摘要，不让用户进入巨大 JSON 感的编辑器才知道。</div></div>
+              <button class="secondary">Review</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="general">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">General</h1>
+              <p class="page-desc">只放真正的个人偏好和默认工作区。这里应该短、稳、低风险，像 Claude / Codex 那样一眼能扫完。</p>
+            </div>
+            <button class="primary">Save changes</button>
+          </div>
+          <div class="hero-panel">
+            <div class="hero-copy">
+              <div class="hero-eyebrow">Personal preferences</div>
+              <div class="hero-big">界面、工作区和新会话默认值</div>
+              <p class="hero-text">General 不承载开发者工具；用户来到这里，只需要完成“我想让 Pi Web 以后怎么默认工作”。</p>
+              <div class="hero-actions">
+                <button class="secondary">Reset to defaults</button>
+                <button class="ghost">Open preferences file</button>
+              </div>
+            </div>
+            <div class="stat-stack">
+              <div class="stat"><div class="stat-label">Language</div><div class="stat-value">简体中文</div><div class="stat-help">Applies immediately</div></div>
+              <div class="stat"><div class="stat-label">Default cwd</div><div class="stat-value">pi-cwd</div><div class="stat-help">Used by new chats</div></div>
+            </div>
+          </div>
+          <div class="card setting-list">
+            <div class="setting-row">
+              <div><div class="setting-name">Display language</div><div class="setting-help">Choose the display language for the product UI.</div></div>
+              <div class="segmented"><button>English</button><button class="active">简体中文</button></div>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-name">Workspace default</div><div class="setting-help">Current project root used by new conversations.</div></div>
+              <div class="inline-actions"><div class="code">~/pi-cwd-20260603</div><button class="secondary">Change</button></div>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-name">Open file previews on the right</div><div class="setting-help">Keep generated files and clicked paths in the right preview panel.</div></div>
+              <div class="toggle"><div class="knob"></div></div>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-name">Start screen</div><div class="setting-help">Choose what Pi Web shows when no conversation is selected.</div></div>
+              <div class="segmented"><button class="active">Home</button><button>Last chat</button><button>New chat</button></div>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-name">Developer hints</div><div class="setting-help">Show paths, route names, and advanced diagnostics inline.</div></div>
+              <div class="toggle off"><div class="knob"></div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="agent">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">Agent Overview</h1>
+              <p class="page-desc">这里是 Agent 能力总览；真正的“添加模型”和“添加技能”进入独立页面，保留之前树形编辑器的效率，同时降低新用户理解成本。</p>
+            </div>
+            <div class="inline-actions"><button class="secondary" data-jump="skills">Manage skills</button><button class="primary" data-jump="models">Open Models</button></div>
+          </div>
+
+          <div class="hero-panel">
+            <div class="hero-copy">
+              <div class="hero-eyebrow">Default runtime</div>
+              <div class="hero-big">Claude Sonnet 4.6 via zenmux</div>
+              <p class="hero-text">把“当前默认模型是什么、是否能处理图片、工具权限多宽”放在同一视野里，避免用户在多个弹窗间跳来跳去。</p>
+              <div class="hero-actions"><button class="primary" data-jump="models">Change default model</button><button class="secondary" data-jump="models">Connect account</button></div>
+            </div>
+            <div class="stat-stack">
+              <div class="stat"><div class="stat-label">Providers</div><div class="stat-value">3 connected</div><div class="stat-help">zenmux · OpenAI · Anthropic</div></div>
+              <div class="stat"><div class="stat-label">Skills</div><div class="stat-value">12 installed</div><div class="stat-help">6 workspace · 6 global</div></div>
+            </div>
+          </div>
+
+          <div class="section-title">Available models</div>
+          <div class="model-list">
+            <div class="model-card">
+              <div><div class="model-name">Claude Sonnet 4.6</div><div class="model-meta">zenmux · default · text + image · good for coding and review</div></div>
+              <span class="status-chip">Default</span>
+            </div>
+            <div class="model-card">
+              <div><div class="model-name">GPT-5.5</div><div class="model-meta">OpenAI · frontier reasoning · best for complex planning</div></div>
+              <button class="secondary">Set default</button>
+            </div>
+            <div class="model-card">
+              <div><div class="model-name">Claude Opus 4.1</div><div class="model-meta">Anthropic · high quality writing and code review</div></div>
+              <button class="secondary">Set default</button>
+            </div>
+          </div>
+
+          <div class="section-title">Tool permissions</div>
+          <div class="card setting-list">
+            <div class="setting-row"><div><div class="setting-name">Default tool preset</div><div class="setting-help">Low / High presets keep new-session choices understandable.</div></div><div class="segmented"><button>Low</button><button class="active">High</button></div></div>
+            <div class="setting-row"><div><div class="setting-name">File editing tools</div><div class="setting-help">read · bash · edit · write are available by default.</div></div><span class="status-chip">Enabled</span></div>
+            <div class="setting-row"><div><div class="setting-name">Network-aware tools</div><div class="setting-help">Search and external connectors are shown only when configured.</div></div><span class="status-chip gray">Not configured</span></div>
+          </div>
+
+          <div class="section-title">Installed skills</div>
+          <div class="skill-grid">
+            <div class="skill-card" data-jump="skills"><div><div class="skill-name">browse</div><div class="skill-meta">Fast browser QA and screenshots.</div></div><div class="skill-tag-row"><span class="tag">global</span><span class="tag">QA</span></div></div>
+            <div class="skill-card" data-jump="skills"><div><div class="skill-name">investigate</div><div class="skill-meta">Systematic root-cause debugging.</div></div><div class="skill-tag-row"><span class="tag">global</span><span class="tag">debug</span></div></div>
+            <div class="skill-card" data-jump="skills"><div><div class="skill-name">amazon-listing</div><div class="skill-meta">Listing, A+ content, image prompt workflows.</div></div><div class="skill-tag-row"><span class="tag">workspace</span><span class="tag">commerce</span></div></div>
+          </div>
+        </section>
+
+        <section class="page" id="models">
+          <div class="module-window">
+            <div class="module-titlebar">
+              <div class="module-titlegroup"><span class="module-title">模型</span><span class="module-path">~/.pi/agent/models.json</span></div>
+              <button class="module-close" aria-label="Close">×</button>
+            </div>
+            <div class="management-top">
+              <div><div class="setting-name">默认模型</div><div class="setting-help">新建对话时使用。可在输入框下方随时切换模型。</div></div>
+              <div class="select-like" data-panel="default-model"><span>DeepSeek V4 Pro <span style="color: var(--muted)">(deepseek)</span></span><span>⌄</span></div>
+              <div class="setting-help">每条对话都可在输入框下方的模型选择器中单独指定模型。</div>
+            </div>
+            <div class="management-body">
+              <aside class="manager-left">
+                <div class="manager-list">
+                  <div class="tree-row" data-model-detail="subscription"><span class="tree-icon">◎</span><span>ChatGPT Plus/Pro</span><span style="margin-left:auto" class="tag">已连接</span></div>
+                  <div class="tree-row" data-model-detail="subscription"><span class="tree-icon">D</span><span>DeepSeek</span></div>
+                  <div class="tree-group">Custom</div>
+                  <div class="tree-row active" data-provider-detail><span class="tree-icon">⌘</span><span>agnes</span></div>
+                  <div class="tree-row tree-indent" data-model-detail="model"><span>agnes-1.5-flash</span></div>
+                  <div class="tree-row tree-indent" data-model-detail="model"><span>agnes-2.0-flash</span><span class="tag" style="margin-left:auto">T</span></div>
+                  <div class="tree-row tree-indent dim" data-model-add-mode><span>＋ 模型</span></div>
+                  <div class="tree-row" data-provider-new-mode><span class="tree-icon">⌘</span><span>new-provider</span></div>
+                  <div class="tree-row tree-indent dim" data-model-add-mode><span>新模型</span></div>
+                  <div class="tree-row tree-indent dim" data-model-add-mode><span>＋ 模型</span></div>
+                </div>
+                <div class="manager-footer"><button class="manager-add" data-panel="provider-picker">＋ 添加 provider</button></div>
+              </aside>
+              <section class="manager-detail" id="modelDetailPane">
+                <div class="big-form wide">
+                  <div class="detail-head">
+                    <div><h2 class="detail-title">Provider</h2></div>
+                    <button class="danger" data-panel="remove-model">删除</button>
+                  </div>
+                  <div class="form-section">
+                    <div class="form-section-title">Provider</div>
+                    <div class="field"><div class="field-label">Provider 名称</div><div class="input-like" contenteditable="true">agnes</div></div>
+                    <div class="field"><div class="field-label">Base URL</div><div class="input-like" contenteditable="true">https://apihub.example.com/v1</div></div>
+                    <div class="field">
+                      <div class="field-label">API Key</div>
+                      <div class="secret-field"><div class="input-like" contenteditable="true">••••••••••••••••••••••••••••••••••••••••••</div><button class="icon-button" aria-label="显示 API key">◉</button></div>
+                      <div class="field-help">使用 ! 前缀可执行 shell 命令，也可以填写环境变量名</div>
+                    </div>
+                    <div class="field"><div class="field-label">API</div><div class="select-like"><span>openai-completions</span><span>⌄</span></div></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <div class="save-bar"><button class="secondary">取消</button><button class="primary" data-toast="Models saved">保存</button></div>
+          </div>
+        </section>
+
+        <section class="page" id="skills">
+          <div class="module-window">
+            <div class="module-titlebar">
+              <div class="module-titlegroup"><span class="module-title">技能</span><span class="module-path">~/pi-cwd-20260603</span></div>
+              <button class="module-close" aria-label="Close">×</button>
+            </div>
+            <div class="management-body">
+              <aside class="manager-left">
+                <div class="manager-list">
+                  <div class="tree-group">全局</div>
+                  <div class="tree-row active" data-skill-detail><span class="tree-icon">•</span><span>ai-image-generation</span></div>
+                  <div class="tree-row" data-skill-detail><span class="tree-icon">•</span><span>brainstorming</span></div>
+                  <div class="tree-row" data-skill-detail><span class="tree-icon">•</span><span>browse</span></div>
+                  <div class="tree-row" data-skill-detail><span class="tree-icon">•</span><span>investigate</span></div>
+                  <div class="tree-row" data-skill-detail><span class="tree-icon">•</span><span>workctl</span></div>
+                </div>
+                <div class="manager-footer"><button class="manager-add" id="skillAddButton" data-skill-add-mode>＋ 添加技能</button></div>
+              </aside>
+              <section class="manager-detail" id="skillDetailPane">
+                <div class="big-form">
+                  <div class="detail-head">
+                    <div><p class="detail-desc"><span class="tag">global</span> <span class="module-path">~/tmp/pi-dev-agent/skills/ai-image-generation/SKILL.md</span></p></div>
+                    <div class="toggle off"><div class="knob"></div></div>
+                  </div>
+                  <div class="form-section">
+                    <div class="form-section-title">名称</div>
+                    <div class="hero-big" style="font-size: 24px">ai-image-generation</div>
+                  </div>
+                  <div class="form-section">
+                    <div class="form-section-title">描述</div>
+                    <p class="hero-text" style="font-size: 19px; max-width: 980px">Generate AI images with GPT-Image-2, FLUX, Gemini, Grok, Seedream, Reve and 50+ models via inference.sh CLI. Use for AI art, product mockups, concept art, social media graphics, marketing visuals, illustrations, and image editing workflows.</p>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <div class="save-bar"><button class="secondary">关闭</button></div>
+          </div>
+        </section>
+
+        <section class="page" id="remote">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">Remote & Security</h1>
+              <p class="page-desc">远程访问是高风险能力，默认只露出安全状态和最常用操作。开发型隧道/Relay/Audit 移到 Advanced。</p>
+            </div>
+            <span class="status-chip">Enabled</span>
+          </div>
+
+          <div class="security-strip">
+            <div class="security-tile"><div class="stat-label">Mode</div><div class="stat-value">Read-only</div><div class="stat-help">Recommended for phones</div></div>
+            <div class="security-tile"><div class="stat-label">Devices</div><div class="stat-value">2 paired</div><div class="stat-help">Last seen 3 min ago</div></div>
+            <div class="security-tile"><div class="stat-label">Host policy</div><div class="stat-value">Loopback + auth</div><div class="stat-help">Safe by default</div></div>
+          </div>
+
+          <div class="hero-panel">
+            <div class="hero-copy">
+              <div class="hero-eyebrow">Pairing</div>
+              <div class="hero-big">Connect another device</div>
+              <p class="hero-text">配对行为成为 Remote 页的核心任务；用户看到 QR / 链接 / 过期时间，而不是先看到 cloudflared 或 relay 命令。</p>
+              <div class="hero-actions"><button class="primary">Create pairing link</button><button class="secondary">Copy current link</button></div>
+            </div>
+            <div class="qr-card" aria-label="QR code placeholder"></div>
+          </div>
+
+          <div class="card setting-list">
+            <div class="setting-row">
+              <div><div class="setting-name">Remote access</div><div class="setting-help">Let another phone or computer view conversations on this Mac.</div></div>
+              <button class="danger">Disable</button>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-name">Access mode</div><div class="setting-help">Recommended for phone review: read-only mode.</div></div>
+              <div class="segmented"><button class="active">Read-only</button><button>Edit</button></div>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-name">Allowed hosts</div><div class="setting-help">Optional allowlist for remote clients.</div></div>
+              <div class="inline-actions"><div class="code">localhost · 127.0.0.1</div><button class="secondary">Edit</button></div>
+            </div>
+            <div class="setting-row">
+              <div><div class="setting-name">Push notifications</div><div class="setting-help">Notify when an agent run finishes and native notifications are unavailable.</div></div>
+              <div class="toggle"><div class="knob"></div></div>
+            </div>
+          </div>
+
+          <div class="section-title">Paired devices</div>
+          <div class="card">
+            <div class="device"><div><div class="device-title">mk’s iPhone</div><div class="device-meta">Last seen 3 min ago · Safari iOS</div></div><button class="secondary">Revoke</button></div>
+            <div class="device"><div><div class="device-title">MacBook Preview</div><div class="device-meta">Last seen yesterday · Chrome</div></div><button class="secondary">Revoke</button></div>
+            <div class="device"><div><div class="device-title">Add another device</div><div class="device-meta">Scan QR code or copy pairing link.</div></div><button class="primary">Pair Device</button></div>
+          </div>
+
+          <div class="section-title">Sensitive actions</div>
+          <div class="card setting-list danger-zone">
+            <div class="setting-row"><div><div class="setting-name">Rotate master token</div><div class="setting-help">Existing paired devices remain listed, but new auth material is generated.</div></div><button class="danger">Rotate</button></div>
+            <div class="setting-row"><div><div class="setting-name">Revoke all devices</div><div class="setting-help">Immediately disconnect all remote clients.</div></div><button class="danger">Revoke all</button></div>
+          </div>
+        </section>
+
+        <section class="page" id="advanced">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">Advanced</h1>
+              <p class="page-desc">把开发者和迁移类工具集中在这里，普通用户不会被命令、日志、JSON 包和扩展路径打断。</p>
+            </div>
+            <span class="status-chip orange">Developer</span>
+          </div>
+
+          <div class="advanced-callout">
+            <div class="advanced-mark">⌥</div>
+            <div><div class="setting-name">Advanced mode is for diagnostics and portability</div><div class="setting-help">这些能力仍然可访问，但不再构成设置页默认阅读路径。</div></div>
+            <button class="secondary">Learn more</button>
+          </div>
+
+          <div class="section-title">Extensions</div>
+          <div class="card setting-list">
+            <div class="setting-row"><div><div class="setting-name">Installed extensions</div><div class="setting-help">Read-only list of pi extensions loaded for your workspace.</div></div><button class="secondary">Refresh</button></div>
+            <div class="setting-row"><div><div class="setting-name">Extension path</div><div class="setting-help">Shown as diagnostic data, not a primary user-facing control.</div></div><div class="code">~/.pi/extensions</div></div>
+          </div>
+
+          <div class="section-title">Scene packs</div>
+          <div class="hero-panel">
+            <div class="hero-copy">
+              <div class="hero-eyebrow">Portable presets</div>
+              <div class="hero-big">Export or import scene overrides</div>
+              <p class="hero-text">Scene Pack 是迁移/团队共享工具，保留完整能力，但放在 Advanced 里不会干扰普通设置任务。</p>
+              <div class="hero-actions"><button class="secondary">Export pack</button><button class="primary">Import pack</button></div>
+            </div>
+            <div class="stat-stack">
+              <div class="stat"><div class="stat-label">Overrides</div><div class="stat-value">4 scenes</div><div class="stat-help">Report Gen · QA · Research · Listing</div></div>
+              <div class="stat"><div class="stat-label">Last import</div><div class="stat-value">Never</div><div class="stat-help">Preview before apply</div></div>
+            </div>
+          </div>
+
+          <div class="section-title">Remote developer tools</div>
+          <div class="command-list">
+            <div class="command-card"><div class="command-title">Public tunnel</div><div class="command-help">Expose local server through cloudflared or Tailscale when pairing over LAN is not enough.</div><div class="code">cloudflared tunnel --url http://127.0.0.1:30141</div></div>
+            <div class="command-card"><div class="command-title">E2EE relay</div><div class="command-help">Generate relay offer and copy bootstrap commands.</div><div class="code">npm run relay:client -- '&lt;offer-url&gt;'</div></div>
+          </div>
+
+          <div class="section-title">Audit log</div>
+          <div class="audit-list">
+            <div class="audit-item"><div class="audit-dot blue"></div><div><div class="audit-title">Pairing link created</div><div class="audit-meta">Today 12:10 · localhost · /api/remote</div></div><button class="secondary">Details</button></div>
+            <div class="audit-item"><div class="audit-dot"></div><div><div class="audit-title">Remote client authenticated</div><div class="audit-meta">Today 12:08 · mk’s iPhone · read-only</div></div><button class="secondary">Details</button></div>
+            <div class="audit-item"><div class="audit-dot orange"></div><div><div class="audit-title">Settings updated</div><div class="audit-meta">Yesterday 18:42 · allowed hosts changed</div></div><button class="secondary">Details</button></div>
+          </div>
+        </section>
+
+        <section class="page" id="about">
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">About & Diagnostics</h1>
+              <p class="page-desc">版本、活动统计和诊断信息放这里；它们有价值，但不应压住设置页核心操作。</p>
+            </div>
+            <button class="secondary">Copy diagnostics</button>
+          </div>
+
+          <div class="hero-panel">
+            <div class="hero-copy">
+              <div class="hero-eyebrow">Install health</div>
+              <div class="hero-big">Pi Web is up to date</div>
+              <p class="hero-text">About 页聚合版本、运行状态和活动摘要。诊断按钮服务于支持场景，不打扰设置核心路径。</p>
+              <div class="hero-actions"><button class="secondary">Open logs</button><button class="secondary">Check server</button></div>
+            </div>
+            <div class="stat-stack">
+              <div class="stat"><div class="stat-label">Server</div><div class="stat-value">30142 dev</div><div class="stat-help">Isolated from 30141 daily use</div></div>
+              <div class="stat"><div class="stat-label">Data dir</div><div class="stat-value">pi-dev-agent</div><div class="stat-help">Development sessions</div></div>
+            </div>
+          </div>
+
+          <div class="grid two">
+            <div class="card setting-list">
+              <div class="setting-row"><div><div class="setting-name">pi-web</div><div class="setting-help">Current app version.</div></div><div class="code">v0.6.13</div></div>
+              <div class="setting-row"><div><div class="setting-name">pi-coding-agent</div><div class="setting-help">Bundled agent runtime.</div></div><div class="code">v0.78.0</div></div>
+              <div class="setting-row"><div><div class="setting-name">Build channel</div><div class="setting-help">Current environment used by this prototype.</div></div><span class="status-chip orange">Dev</span></div>
+            </div>
+            <div class="card">
+              <div class="mini-chart">
+                <div class="bar-wrap"><div class="bars"><span class="bar" style="height:4px"></span><span class="bar green" style="height:4px"></span></div><span>05-30</span></div>
+                <div class="bar-wrap"><div class="bars"><span class="bar" style="height:4px"></span><span class="bar green" style="height:4px"></span></div><span>05-31</span></div>
+                <div class="bar-wrap"><div class="bars"><span class="bar" style="height:4px"></span><span class="bar green" style="height:4px"></span></div><span>06-01</span></div>
+                <div class="bar-wrap"><div class="bars"><span class="bar" style="height:20px"></span><span class="bar green" style="height:4px"></span></div><span>06-02</span></div>
+                <div class="bar-wrap"><div class="bars"><span class="bar" style="height:78px"></span><span class="bar green" style="height:68px"></span></div><span>06-03</span></div>
+                <div class="bar-wrap"><div class="bars"><span class="bar" style="height:4px"></span><span class="bar orange" style="height:42px"></span></div><span>06-04</span></div>
+                <div class="bar-wrap"><div class="bars"><span class="bar" style="height:20px"></span><span class="bar green" style="height:18px"></span></div><span>06-05</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title">Diagnostics bundle</div>
+          <div class="card setting-list">
+            <div class="setting-row"><div><div class="setting-name">Recent activity</div><div class="setting-help">Sessions started/completed over the last 7 days.</div></div><button class="secondary">View detail</button></div>
+            <div class="setting-row"><div><div class="setting-name">Environment summary</div><div class="setting-help">Port, data directory, model default, remote status.</div></div><button class="secondary">Copy</button></div>
+            <div class="setting-row"><div><div class="setting-name">Reset local UI state</div><div class="setting-help">Clear local browser layout preferences without deleting sessions.</div></div><button class="danger">Reset UI</button></div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div class="overlay" id="overlay" aria-hidden="true"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div>
+        <div class="drawer-kicker" id="drawerKicker">Prototype action</div>
+        <div class="drawer-title" id="drawerTitle">Action</div>
+        <div class="drawer-desc" id="drawerDesc">This panel demonstrates the proposed interaction.</div>
+      </div>
+      <button class="drawer-close" id="drawerClose" aria-label="Close">×</button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+    <div class="drawer-foot" id="drawerFoot">
+      <button class="secondary" id="drawerCancel">Cancel</button>
+      <button class="primary" id="drawerPrimary">Done</button>
+    </div>
+  </aside>
+  <div class="toast" id="toast">Done</div>
+
+  <script>
+    const navItems = Array.from(document.querySelectorAll(".nav-item"));
+    const pages = Array.from(document.querySelectorAll(".page"));
+    const overlay = document.getElementById("overlay");
+    const drawer = document.getElementById("drawer");
+    const drawerKicker = document.getElementById("drawerKicker");
+    const drawerTitle = document.getElementById("drawerTitle");
+    const drawerDesc = document.getElementById("drawerDesc");
+    const drawerBody = document.getElementById("drawerBody");
+    const drawerPrimary = document.getElementById("drawerPrimary");
+    const drawerClose = document.getElementById("drawerClose");
+	    const drawerCancel = document.getElementById("drawerCancel");
+	    const toast = document.getElementById("toast");
+	    const modelDetailPane = document.getElementById("modelDetailPane");
+	    const skillDetailPane = document.getElementById("skillDetailPane");
+	    let currentPanelKey = "";
+    const appScreens = Array.from(document.querySelectorAll(".app-screen"));
+    const appTargets = Array.from(document.querySelectorAll("[data-app-target]"));
+    const appCrumb = document.getElementById("appCrumb");
+    const appLabels = {
+      "app-home": "首页",
+      "app-chat": "对话",
+      "app-file": "文件预览",
+      "app-new": "新建对话",
+      "app-history": "全部工作",
+      "app-modules": "功能总览",
+      "app-settings": "设置"
+    };
+
+    const panelTemplates = {
+	      "provider-picker": {
+	        kicker: "添加 provider",
+	        title: "添加 provider",
+	        desc: "搜索在顶部，按自定义 / 订阅 / API Key 分组。选中 provider 后回到同一套左树 + 右表单结构继续配置。",
+	        primary: "添加 provider",
+	        toast: "Provider added",
+	        body: `
+	          <div class="field"><div class="input-like placeholder" contenteditable="true">搜索 providers...</div></div>
+	          <div class="section-title">自定义</div>
+	          <div class="provider-picker-grid">
+	            <div class="provider-picker-card selected-outline"><div><div class="model-name">OpenAI / Anthropic 兼容</div><div class="model-meta">自定义 endpoint 格式</div></div><div class="provider-logo gray">＋</div></div>
+	          </div>
+	          <div class="section-title">订阅</div>
+	          <div class="provider-picker-grid">
+	            <div class="provider-picker-card"><div><div class="model-name">GitHub Copilot</div><div class="model-meta">OAuth</div></div><div class="provider-logo gray">GH</div></div>
+	          </div>
+          <div class="section-title">API Key</div>
+          <div class="provider-picker-grid">
+            <div class="provider-picker-card"><div><div class="model-name">Amazon Bedrock</div><div class="model-meta">90 models</div></div><div class="provider-logo orange">aws</div></div>
+            <div class="provider-picker-card"><div><div class="model-name">Azure OpenAI Responses</div><div class="model-meta">42 models</div></div><div class="provider-logo">Az</div></div>
+            <div class="provider-picker-card"><div><div class="model-name">Google Gemini</div><div class="model-meta">16 models</div></div><div class="provider-logo green">G</div></div>
+            <div class="provider-picker-card"><div><div class="model-name">Groq</div><div class="model-meta">18 models</div></div><div class="provider-logo gray">g</div></div>
+            <div class="provider-picker-card"><div><div class="model-name">Mistral</div><div class="model-meta">28 models</div></div><div class="provider-logo orange">M</div></div>
+            <div class="provider-picker-card"><div><div class="model-name">OpenAI</div><div class="model-meta">42 models</div></div><div class="provider-logo">O</div></div>
+          </div>`
+      },
+      "model-wizard": {
+        kicker: "Add model",
+        title: "Choose provider first",
+        desc: "新模型从 provider 开始添加，避免让用户直接面对 models.json。",
+        primary: "Continue to fields",
+        toast: "Provider selected",
+        body: `
+          <div class="progress-steps"><div class="progress-step active"></div><div class="progress-step"></div><div class="progress-step"></div></div>
+          <div class="choice-grid">
+            <div class="choice-card active"><div class="provider-logo">O</div><div class="model-name">OpenAI</div><div class="model-meta">API key · official models</div></div>
+            <div class="choice-card"><div class="provider-logo green">A</div><div class="model-name">Anthropic</div><div class="model-meta">OAuth or API key</div></div>
+            <div class="choice-card"><div class="provider-logo orange">Z</div><div class="model-name">ZenMux</div><div class="model-meta">Custom endpoint</div></div>
+            <div class="choice-card"><div class="provider-logo gray">+</div><div class="model-name">Custom</div><div class="model-meta">OpenAI-compatible</div></div>
+          </div>
+          <div class="card setting-list">
+            <div class="setting-row"><div><div class="setting-name">Install destination</div><div class="setting-help">The model is saved into ~/.pi/agent/models.json.</div></div><span class="status-chip gray">Global</span></div>
+            <div class="setting-row"><div><div class="setting-name">Connection setup</div><div class="setting-help">Use existing credentials when available; otherwise guide account/API key connection.</div></div><button class="secondary">Connect</button></div>
+          </div>`
+      },
+      "model-wizard-fields": {
+        kicker: "Add model",
+        title: "Describe model capabilities",
+        desc: "第二步专注字段填写；高级参数默认折叠，保留完整配置能力。",
+        primary: "Test & save",
+        toast: "Model saved to prototype",
+        body: `
+          <div class="progress-steps"><div class="progress-step active"></div><div class="progress-step active"></div><div class="progress-step"></div></div>
+          <div class="form-grid">
+            <div class="field"><div class="field-label">Model ID</div><div class="input-like" contenteditable="true">gpt-5.5</div></div>
+            <div class="field"><div class="field-label">Display name</div><div class="input-like" contenteditable="true">GPT-5.5</div></div>
+            <div class="field"><div class="field-label">Context window</div><div class="input-like" contenteditable="true">200000</div></div>
+            <div class="field"><div class="field-label">Max output</div><div class="input-like" contenteditable="true">8192</div></div>
+          </div>
+          <div class="cap-row"><span class="cap active">Text</span><span class="cap active">Image input</span><span class="cap active">Reasoning</span><span class="cap">Video</span></div>
+          <div class="card setting-list">
+            <div class="setting-row"><div><div class="setting-name">Reasoning / thinking</div><div class="setting-help">Only enable when the model supports it.</div></div><div class="toggle"><div class="knob"></div></div></div>
+            <div class="setting-row"><div><div class="setting-name">Cost tracking</div><div class="setting-help">Optional per-million-token pricing.</div></div><button class="secondary">Add cost</button></div>
+          </div>`
+      },
+      "provider-wizard": {
+        kicker: "Add provider",
+        title: "Connect a provider",
+        desc: "保留 OAuth/API Key/Custom 三类方式，但先让用户选择连接形态。",
+        primary: "Save provider",
+        toast: "Provider added",
+        body: `
+          <div class="choice-grid">
+            <div class="choice-card active"><div class="model-name">OAuth subscription</div><div class="model-meta">Claude Code / provider account style login.</div></div>
+            <div class="choice-card"><div class="model-name">API key</div><div class="model-meta">Paste key or use environment variable.</div></div>
+            <div class="choice-card"><div class="model-name">Custom endpoint</div><div class="model-meta">OpenAI or Anthropic compatible URL.</div></div>
+            <div class="choice-card"><div class="model-name">Import JSON</div><div class="model-meta">Power-user path from existing models.json.</div></div>
+          </div>
+          <div class="form-grid">
+            <div class="field"><div class="field-label">Provider name</div><div class="input-like" contenteditable="true">new-provider</div></div>
+            <div class="field"><div class="field-label">API format</div><div class="input-like">OpenAI completions</div></div>
+          </div>`
+      },
+      "default-model": {
+        kicker: "Default model",
+        title: "Choose the model for new conversations",
+        desc: "默认模型单独设置；每个会话仍可在输入框覆盖。",
+        primary: "Set as default",
+        toast: "Default model updated",
+        body: `
+          <div class="market-list">
+            <div class="market-item"><div><div class="model-name">Claude Sonnet 4.6</div><div class="model-meta">zenmux · current default · text + image</div></div><span class="status-chip">Default</span></div>
+            <div class="market-item"><div><div class="model-name">GPT-5.5</div><div class="model-meta">OpenAI · complex planning and reasoning</div></div><button class="secondary">Choose</button></div>
+            <div class="market-item"><div><div class="model-name">Claude Opus 4.1</div><div class="model-meta">Anthropic · review and writing</div></div><button class="secondary">Choose</button></div>
+          </div>`
+      },
+      "raw-models-json": {
+        kicker: "Advanced JSON",
+        title: "models.json preview",
+        desc: "保留旧方式里的透明度，但把它降为高级预览，不做首屏入口。",
+        primary: "Copy JSON",
+        toast: "models.json copied",
+        body: `<div class="drawer-code">{
+  "providers": {
+    "zenmux": {
+      "api": "openai-completions",
+      "baseURL": "https://api.zenmux.ai/v1",
+      "models": [
+        { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "input": ["text", "image"] }
+      ]
+    }
+  }
+}</div>`
+      },
+	      "models-import": {
+	        kicker: "Import",
+	        title: "Import models.json",
+	        desc: "导入前先预览变更，避免误覆盖现有 Provider 和默认模型。",
+        primary: "Preview import",
+        toast: "Import preview ready",
+        body: `
+          <div class="empty-state">Drop a models.json file here, or choose a file. Prototype shows the intended interaction only.</div>
+	          <div class="card setting-list">
+	            <div class="setting-row"><div><div class="setting-name">Merge strategy</div><div class="setting-help">Recommended: merge providers and keep current default unless imported file explicitly changes it.</div></div><div class="segmented"><button class="active">Merge</button><button>Replace</button></div></div>
+	          </div>`
+	      },
+	      "remove-model": {
+	        kicker: "Danger zone",
+	        title: "Remove this item?",
+	        desc: "真实实现应明确删除 provider 会影响其下所有模型；删除模型只移除当前模型配置。",
+	        primary: "Remove",
+	        toast: "Removed from prototype",
+	        body: `<div class="card setting-list danger-zone"><div class="setting-row"><div><div class="setting-name">Configuration item</div><div class="setting-help">This is a destructive action preview for the prototype.</div></div><button class="danger">Remove</button></div></div>`
+	      },
+	      "skill-wizard": {
+        kicker: "Add skill",
+        title: "Search and install a skill",
+        desc: "添加技能时先看用途、来源、scope 和 prompt 可见性。",
+        primary: "Install selected",
+        toast: "Skill installed",
+        body: `
+          <div class="field"><div class="field-label">Search</div><div class="input-like" contenteditable="true">playwright browser qa</div></div>
+          <div class="market-list">
+            <div class="market-item"><div><div class="model-name">playwright</div><div class="model-meta">Automate browser flows, screenshots, and QA assertions.</div><div class="skill-tag-row"><span class="tag">browser</span><span class="tag">testing</span></div></div><span class="status-chip orange">Recommended</span></div>
+            <div class="market-item"><div><div class="model-name">openai-docs</div><div class="model-meta">Official OpenAI docs and model guidance.</div><div class="skill-tag-row"><span class="tag">docs</span><span class="tag">api</span></div></div><span class="status-chip gray">Installed</span></div>
+          </div>
+          <div class="card setting-list">
+            <div class="setting-row"><div><div class="setting-name">Install scope</div><div class="setting-help">Project is recommended for workspace-specific skills.</div></div><div class="segmented"><button class="active">Project</button><button>Global</button></div></div>
+            <div class="setting-row"><div><div class="setting-name">Visible in model prompt</div><div class="setting-help">Allow the agent to discover and invoke it automatically.</div></div><div class="toggle"><div class="knob"></div></div></div>
+          </div>`
+      },
+      "skill-local": {
+        kicker: "Add local skill",
+        title: "Install from a local path",
+        desc: "保留 path 类型能力，但用更清楚的路径输入和校验状态表达。",
+        primary: "Add path",
+        toast: "Local skill path added",
+        body: `
+          <div class="field"><div class="field-label">Skill folder</div><div class="input-like" contenteditable="true">/Users/mk/.codex/skills/my-skill</div></div>
+          <div class="card setting-list">
+            <div class="setting-row"><div><div class="setting-name">Validation</div><div class="setting-help">Looks for SKILL.md and frontmatter metadata.</div></div><span class="status-chip">Valid</span></div>
+            <div class="setting-row"><div><div class="setting-name">Scope</div><div class="setting-help">Path skills stay linked to the original folder.</div></div><span class="status-chip gray">Path</span></div>
+          </div>`
+      },
+      "skill-visibility": {
+        kicker: "Prompt visibility",
+        title: "Decide what the model can see",
+        desc: "这是旧设计里很好的能力：不卸载技能，只控制是否进入模型提示。",
+        primary: "Save visibility",
+        toast: "Visibility updated",
+        body: `
+          <div class="card setting-list">
+            <div class="setting-row"><div><div class="setting-name">browse</div><div class="setting-help">Visible · browser QA and screenshots</div></div><div class="toggle"><div class="knob"></div></div></div>
+            <div class="setting-row"><div><div class="setting-name">workctl</div><div class="setting-help">Hidden · only manually invoked</div></div><div class="toggle off"><div class="knob"></div></div></div>
+            <div class="setting-row"><div><div class="setting-name">amazon-listing</div><div class="setting-help">Visible · commerce workflows</div></div><div class="toggle"><div class="knob"></div></div></div>
+          </div>`
+      },
+      "remove-skill": {
+        kicker: "Danger zone",
+        title: "Remove skill from project?",
+        desc: "原型展示危险操作确认。真实实现应说明是否删除文件，还是只移除引用。",
+        primary: "Remove",
+        toast: "Skill removed from prototype",
+        body: `<div class="card setting-list danger-zone"><div class="setting-row"><div><div class="setting-name">amazon-listing</div><div class="setting-help">Remove this skill from the current project scope.</div></div><button class="danger">Remove</button></div></div>`
+      }
+    };
+
+    function activate(id) {
+      navItems.forEach((item) => item.classList.toggle("active", item.dataset.target === id));
+      pages.forEach((page) => page.classList.toggle("active", page.id === id));
+      toast.classList.remove("show");
+      history.replaceState(null, "", `#${id}`);
+    }
+
+    function activateAppScreen(id, options = {}) {
+      const replaceHash = options.replaceHash !== false;
+      appScreens.forEach((screen) => screen.classList.toggle("active", screen.id === id));
+      appTargets.forEach((item) => {
+        const activeWhen = item.dataset.activeWhen;
+        const isSideTab = item.classList.contains("side-tab");
+        item.classList.toggle("active", activeWhen ? activeWhen === id : isSideTab && item.dataset.appTarget === id);
+      });
+      if (appCrumb) appCrumb.textContent = appLabels[id] || "Pi";
+      if (replaceHash) history.replaceState(null, "", `#${id}`);
+    }
+
+    navItems.forEach((item) => {
+      item.addEventListener("click", () => activate(item.dataset.target));
+    });
+
+    appTargets.forEach((item) => {
+      item.addEventListener("click", () => activateAppScreen(item.dataset.appTarget));
+    });
+
+    document.querySelectorAll("[data-jump]").forEach((card) => {
+      card.addEventListener("click", () => activate(card.dataset.jump));
+    });
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 1500);
+    }
+
+	    function closeDrawer() {
+	      overlay.classList.remove("open");
+	      drawer.classList.remove("open");
+	      drawer.classList.remove("center-modal");
+	      overlay.setAttribute("aria-hidden", "true");
+	      drawer.setAttribute("aria-hidden", "true");
+	    }
+
+	    function openPanel(key) {
+	      const template = panelTemplates[key];
+	      if (!template) return;
+	      currentPanelKey = key;
+	      drawerKicker.textContent = template.kicker;
+      drawerTitle.textContent = template.title;
+      drawerDesc.textContent = template.desc;
+      drawerBody.innerHTML = template.body;
+	      drawerPrimary.textContent = template.primary;
+	      drawerPrimary.dataset.toast = template.toast || "Done";
+	      drawer.classList.toggle("center-modal", key === "provider-picker");
+	      overlay.classList.add("open");
+	      drawer.classList.add("open");
+      overlay.setAttribute("aria-hidden", "false");
+      drawer.setAttribute("aria-hidden", "false");
+    }
+
+	    const skillAddMarkup = `
+	      <div class="big-form wide">
+	        <div class="form-section">
+	          <h2 class="detail-title">添加技能</h2>
+	          <div class="skill-search">
+	            <div class="input-like placeholder" contenteditable="true">例如 react、testing、deploy</div>
+	            <button class="primary" data-toast="Search results updated">搜索</button>
+	          </div>
+	          <div class="scope-path">
+	            <div class="segmented"><button>global</button><button class="active">project</button></div>
+	            <span class="scope-dest">→ ~/pi-cwd-20260603/.pi/agent/skills/</span>
+	          </div>
+	          <p class="hero-text">搜索 <span style="color: var(--blue); font-weight: 760">skills.sh</span> 为你的 agent 发现并安装技能。</p>
+	        </div>
+	      </div>`;
+
+	    const providerExistingDetailMarkup = modelDetailPane?.innerHTML || "";
+    const modelDetailMarkup = `
+      <div class="big-form wide">
+        <div class="detail-head">
+          <div><h2 class="detail-title">模型</h2></div>
+          <div class="inline-actions"><button class="secondary" data-toast="Testing agnes-1.5-flash… OK">测试</button><button class="danger" data-panel="remove-model">移除</button></div>
+        </div>
+        <div class="form-section">
+          <div class="form-grid">
+            <div class="field"><div class="field-label">ID *</div><div class="input-like" contenteditable="true">agnes-1.5-flash</div></div>
+            <div class="field"><div class="field-label">名称</div><div class="input-like" contenteditable="true">agnes-1.5-flash</div></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="field"><div class="field-label">API 覆盖</div><div class="select-like"><span>openai-completions</span><span>⌄</span></div></div>
+          <div class="checkbox-line">
+            <span class="check active"></span><span>推理 / thinking</span>
+            <span class="check active"></span><span>图片输入</span>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="checkbox-line"><span class="check"></span><span>DeepSeek thinking 兼容</span></div>
+          <div class="form-section-title">Thinking Level 映射</div>
+          <div class="thinking-map compact">
+            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot"></span>off</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">off</span></div></div>
+            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot"></span>minimal</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">minimal</span></div></div>
+            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot low"></span>low</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">low</span></div></div>
+            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot medium"></span>medium</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">medium</span></div></div>
+            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot high"></span>high</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">high</span></div></div>
+            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot xhigh"></span>xhigh</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">xhigh</span></div></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-grid">
+            <div class="field"><div class="field-label">上下文窗口（tokens）</div><div class="input-like" contenteditable="true">256000</div></div>
+            <div class="field"><div class="field-label">最大输出 tokens</div><div class="input-like" contenteditable="true">65500</div></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">成本（每百万 tokens）</div>
+          <div class="form-grid">
+            <div class="field"><div class="field-label">input</div><div class="input-like" contenteditable="true">0.07</div></div>
+            <div class="field"><div class="field-label">output</div><div class="input-like" contenteditable="true">0.15</div></div>
+            <div class="field"><div class="field-label">cacheRead</div><div class="input-like" contenteditable="true">0</div></div>
+            <div class="field"><div class="field-label">cacheWrite</div><div class="input-like" contenteditable="true">0</div></div>
+          </div>
+        </div>
+      </div>`;
+	    const modelAddMarkup = `
+	      <div class="big-form wide">
+	        <div class="detail-head">
+	          <div><h2 class="detail-title">模型</h2></div>
+	          <div class="inline-actions"><button class="secondary" data-toast="Fill model ID before testing">测试</button><button class="danger" data-panel="remove-model">移除</button></div>
+	        </div>
+	        <div class="form-section">
+	          <div class="form-grid">
+	            <div class="field"><div class="field-label">ID *</div><div class="input-like placeholder" contenteditable="true">model-id</div></div>
+	            <div class="field"><div class="field-label">名称</div><div class="input-like placeholder" contenteditable="true">Display name</div></div>
+	          </div>
+	        </div>
+	        <div class="form-section">
+		          <div class="field"><div class="field-label">API 覆盖</div><div class="select-like"><span style="color: var(--dim)">— 继承 / 无 —</span><span>⌄</span></div></div>
+		          <div class="checkbox-line">
+		            <span class="check active"></span><span>推理 / thinking</span>
+		            <span class="check"></span><span>图片输入</span>
+		          </div>
+		        </div>
+		        <div class="form-section">
+		          <div class="checkbox-line"><span class="check"></span><span>DeepSeek thinking 兼容</span></div>
+		          <div class="form-section-title">Thinking Level 映射</div>
+		          <div class="thinking-map compact">
+		            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot"></span>off</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">off</span></div></div>
+		            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot"></span>minimal</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">minimal</span></div></div>
+		            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot low"></span>low</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">low</span></div></div>
+		            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot medium"></span>medium</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">medium</span></div></div>
+		            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot high"></span>high</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">high</span></div></div>
+		            <div class="thinking-row"><div class="thinking-label"><span class="thinking-dot xhigh"></span>xhigh</div><div class="mapping-control"><span class="mapping-segment active">Default</span><span class="mapping-segment">Disabled</span></div><div class="mapping-control"><span class="mapping-segment">Custom</span><span class="mapping-segment">xhigh</span></div></div>
+		          </div>
+		        </div>
+		        <div class="form-section">
+		          <div class="form-grid">
+	            <div class="field"><div class="field-label">上下文窗口（tokens）</div><div class="input-like placeholder" contenteditable="true">128000</div></div>
+	            <div class="field"><div class="field-label">最大输出 tokens</div><div class="input-like placeholder" contenteditable="true">16384</div></div>
+	          </div>
+	        </div>
+	        <div class="form-section">
+	          <div class="form-section-title">成本（每百万 tokens）</div>
+	          <div class="form-grid">
+	            <div class="field"><div class="field-label">input</div><div class="input-like placeholder" contenteditable="true">0</div></div>
+	            <div class="field"><div class="field-label">output</div><div class="input-like placeholder" contenteditable="true">0</div></div>
+	            <div class="field"><div class="field-label">cacheRead</div><div class="input-like placeholder" contenteditable="true">0</div></div>
+	            <div class="field"><div class="field-label">cacheWrite</div><div class="input-like placeholder" contenteditable="true">0</div></div>
+	          </div>
+	        </div>
+	      </div>`;
+
+	    const providerDetailMarkup = `
+	      <div class="big-form wide">
+	        <div class="detail-head">
+	          <div><h2 class="detail-title">Provider</h2></div>
+	          <button class="danger" data-panel="remove-model">删除</button>
+	        </div>
+	        <div class="form-section">
+	          <div class="form-section-title">Provider</div>
+	          <div class="field"><div class="field-label">Provider 名称</div><div class="input-like" contenteditable="true">new-provider</div></div>
+	          <div class="field"><div class="field-label">Base URL</div><div class="input-like placeholder" contenteditable="true">https://api.example.com/v1</div></div>
+		          <div class="field">
+		            <div class="field-label">API Key</div>
+		            <div class="secret-field"><div class="input-like placeholder" contenteditable="true">ENV_VAR_NAME、!shell-command 或直接填 key</div><button class="icon-button" aria-label="显示 API key">◉</button></div>
+		            <div class="field-help">使用 ! 前缀可执行 shell 命令，也可以填写环境变量名。</div>
+		          </div>
+	          <div class="field"><div class="field-label">API</div><div class="select-like"><span>openai-completions</span><span>⌄</span></div></div>
+	        </div>
+	      </div>`;
+
+    const skillDetailMarkup = skillDetailPane?.innerHTML || "";
+
+	    function showModelAddMode(activeTarget) {
+	      if (!modelDetailPane) return;
+	      modelDetailPane.innerHTML = modelAddMarkup;
+	      document.querySelectorAll("#models .tree-row").forEach((node) => node.classList.remove("active"));
+	      (activeTarget || document.querySelector("[data-model-add-mode]"))?.classList.add("active");
+	      showToast("Add model mode");
+	    }
+
+	    function showModelDetailMode() {
+	      if (!modelDetailPane) return;
+	      modelDetailPane.innerHTML = modelDetailMarkup;
+	      document.querySelectorAll("#models .tree-row").forEach((node) => node.classList.remove("active"));
+	      document.querySelector("[data-model-detail='model']")?.classList.add("active");
+	      showToast("Model detail");
+	    }
+
+    function showProviderDetailMode(activeTarget, variant = "new") {
+      if (!modelDetailPane) return;
+      modelDetailPane.innerHTML = variant === "existing" ? providerExistingDetailMarkup : providerDetailMarkup;
+      document.querySelectorAll("#models .tree-row").forEach((node) => node.classList.remove("active"));
+      (activeTarget || document.querySelector("[data-provider-new-mode]"))?.classList.add("active");
+      showToast("Provider detail");
+    }
+
+    function showSkillAddMode() {
+      if (!skillDetailPane) return;
+      skillDetailPane.innerHTML = skillAddMarkup;
+      document.querySelectorAll("#skills .tree-row").forEach((node) => node.classList.remove("active"));
+      document.querySelectorAll("[data-skill-add-mode]").forEach((node) => node.classList.add("selected-outline"));
+      showToast("Add Skill mode");
+    }
+
+    function showSkillDetailMode() {
+      if (!skillDetailPane) return;
+      skillDetailPane.innerHTML = skillDetailMarkup;
+      document.querySelectorAll("[data-skill-add-mode]").forEach((node) => node.classList.remove("selected-outline"));
+      document.querySelector("#skills [data-skill-detail]")?.classList.add("active");
+      showToast("Skill detail");
+    }
+
+    document.addEventListener("click", (event) => {
+      const panelTarget = event.target.closest("[data-panel]");
+      if (panelTarget) {
+        openPanel(panelTarget.dataset.panel);
+        return;
+      }
+
+      const toastTarget = event.target.closest("[data-toast]");
+      if (toastTarget) {
+        showToast(toastTarget.dataset.toast);
+        return;
+      }
+
+      const skillAddTarget = event.target.closest("[data-skill-add-mode]");
+      if (skillAddTarget) {
+        showSkillAddMode();
+        return;
+      }
+
+	      const modelAddTarget = event.target.closest("[data-model-add-mode]");
+	      if (modelAddTarget) {
+	        showModelAddMode(modelAddTarget);
+	        return;
+	      }
+
+	      const providerNewTarget = event.target.closest("[data-provider-new-mode]");
+	      if (providerNewTarget) {
+	        showProviderDetailMode(providerNewTarget, "new");
+	        return;
+	      }
+
+	      const providerDetailTarget = event.target.closest("[data-provider-detail]");
+	      if (providerDetailTarget) {
+	        showProviderDetailMode(providerDetailTarget, "existing");
+	        return;
+	      }
+
+      if (event.target.closest("[data-model-detail-back]")) {
+        showModelDetailMode();
+        return;
+      }
+
+      if (event.target.closest("[data-skill-detail-back]")) {
+        showSkillDetailMode();
+        return;
+      }
+
+      const installTarget = event.target.closest("[data-install-skill]");
+      if (installTarget) {
+        installTarget.textContent = "Installed";
+        installTarget.className = "secondary";
+        showToast("Skill installed");
+        return;
+      }
+
+      const toggleTarget = event.target.closest(".toggle");
+      if (toggleTarget) {
+        toggleTarget.classList.toggle("off");
+        showToast(toggleTarget.classList.contains("off") ? "Disabled" : "Enabled");
+        return;
+      }
+
+      const segmentButton = event.target.closest(".segmented button");
+      if (segmentButton) {
+        segmentButton.parentElement.querySelectorAll("button").forEach((button) => button.classList.remove("active"));
+        segmentButton.classList.add("active");
+        showToast(`${segmentButton.textContent.trim()} selected`);
+        return;
+      }
+
+      const selectable = event.target.closest("[data-selectable]");
+      if (selectable) {
+        const group = selectable.dataset.selectable;
+        document.querySelectorAll(`[data-selectable="${group}"]`).forEach((node) => node.classList.remove("selected-outline"));
+        selectable.classList.add("selected-outline");
+        showToast("Selected");
+        return;
+      }
+
+      const railItem = event.target.closest(".rail-item");
+      if (railItem) {
+        const rail = railItem.closest(".split-rail");
+        rail.querySelectorAll(".rail-item").forEach((item) => item.classList.remove("active"));
+        railItem.classList.add("active");
+        showToast(`${railItem.querySelector(".rail-main")?.textContent ?? "Item"} selected`);
+        return;
+      }
+
+      const modelDetailTarget = event.target.closest("[data-model-detail]");
+      if (modelDetailTarget) {
+        if (modelDetailPane) modelDetailPane.innerHTML = modelDetailMarkup;
+        document.querySelectorAll("#models .tree-row").forEach((node) => node.classList.remove("active"));
+        modelDetailTarget.classList.add("active");
+        showToast("Model selected");
+        return;
+      }
+
+      const skillDetailTarget = event.target.closest("[data-skill-detail]");
+      if (skillDetailTarget) {
+        showSkillDetailMode();
+        document.querySelectorAll("#skills .tree-row").forEach((node) => node.classList.remove("active"));
+        skillDetailTarget.classList.add("active");
+      }
+    });
+
+    overlay.addEventListener("click", closeDrawer);
+    drawerClose.addEventListener("click", closeDrawer);
+	    drawerCancel.addEventListener("click", closeDrawer);
+	    drawerPrimary.addEventListener("click", () => {
+	      if (currentPanelKey === "provider-picker") {
+	        showProviderDetailMode(undefined, "new");
+	        closeDrawer();
+	        return;
+	      }
+	      showToast(drawerPrimary.dataset.toast || "Done");
+	      closeDrawer();
+	    });
+
+    drawerBody.addEventListener("click", (event) => {
+      const choice = event.target.closest(".choice-card");
+      if (choice) {
+        const container = choice.parentElement;
+        container.querySelectorAll(".choice-card").forEach((item) => item.classList.remove("active"));
+        choice.classList.add("active");
+        return;
+      }
+
+      const providerCard = event.target.closest(".provider-picker-card");
+      if (providerCard) {
+        drawerBody.querySelectorAll(".provider-picker-card").forEach((item) => item.classList.remove("selected-outline"));
+        providerCard.classList.add("selected-outline");
+      }
+    });
+
+    const initial = location.hash.replace("#", "");
+    const initialElement = initial ? document.getElementById(initial) : null;
+    if (initialElement?.classList.contains("app-screen")) {
+      activateAppScreen(initial, { replaceHash: false });
+    } else if (initialElement) {
+      activateAppScreen("app-settings", { replaceHash: false });
+      activate(initial);
+    } else {
+      activateAppScreen("app-home", { replaceHash: false });
+    }
+
+    window.addEventListener("hashchange", () => {
+      const id = location.hash.replace("#", "");
+      const element = id ? document.getElementById(id) : null;
+      if (element?.classList.contains("app-screen")) {
+        activateAppScreen(id, { replaceHash: false });
+      } else if (element) {
+        activateAppScreen("app-settings", { replaceHash: false });
+        activate(id);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -27,6 +27,7 @@
 
 # misc
 /Users/
+.pi/
 .DS_Store
 *.pem
 .superpowers/

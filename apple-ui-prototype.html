@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pi Agent Web — Apple Style UI Prototype</title>
+<style>
+/* ═══════════════════════════════════════════
+   Apple Design System — Design Tokens
+   ═══════════════════════════════════════════ */
+:root {
+  /* Colors — Light Mode (SF Pro / Apple Human Interface Guidelines) */
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0f0f2;
+  --bg-quaternary: rgba(0,0,0,0.03);
+  --bg-overlay: rgba(0,0,0,0.32);
+
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #a1a1a6;
+  --text-quaternary: rgba(60,60,67,0.4);
+
+  --accent: #007aff;
+  --accent-hover: #0071e6;
+  --accent-active: #0060c4;
+  --accent-secondary: #5e5ce6;
+  --accent-tertiary: rgba(0,122,255,0.08);
+
+  --success: #34c759;
+  --warning: #ff9500;
+  --danger: #ff3b30;
+
+  --border: rgba(0,0,0,0.06);
+  --border-strong: rgba(0,0,0,0.12);
+
+  /* Elevation / Shadows */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+  --shadow-xl: 0 24px 60px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.06);
+
+  /* Blur */
+  --blur: saturate(180%) blur(20px);
+
+  /* Radius — Apple's progressive rounding */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+
+  /* Animation */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-standard: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+}
+
+html.dark {
+  --bg-primary: #000000;
+  --bg-secondary: #1c1c1e;
+  --bg-tertiary: #2c2c2e;
+  --bg-quaternary: rgba(255,255,255,0.04);
+  --bg-overlay: rgba(0,0,0,0.56);
+
+  --text-primary: #f5f5f7;
+  --text-secondary: #98989d;
+  --text-tertiary: #636366;
+  --text-quaternary: rgba(235,235,245,0.36);
+
+  --accent: #0a84ff;
+  --accent-hover: #409cff;
+  --accent-active: #609fff;
+  --accent-secondary: #bf5af2;
+  --accent-tertiary: rgba(10,132,255,0.12);
+
+  --border: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.14);
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.15);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.25);
+  --shadow-xl: 0 24px 60px rgba(0,0,0,0.35);
+}
+
+/* ═══════════════════════════════════════════
+   Reset & Base
+   ═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+  line-height: 1.47;
+}
+
+/* ═══════════════════════════════════════════
+   Layout — Three-Pane Architecture
+   ═══════════════════════════════════════════ */
+.app-shell {
+  display: flex;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+/* ═══════════════════════════════════════════
+   Sidebar — Apple List Style
+   ═══════════════════════════════════════════ */
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: rgba(246,246,248,0.85);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s var(--ease-standard), opacity 0.3s var(--ease-standard);
+  overflow: hidden;
+}
+
+html.dark .sidebar {
+  background: rgba(28,28,30,0.85);
+}
+
+.sidebar-header {
+  padding: 16px 16px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.sidebar-logo .pi-symbol {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sidebar-new-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.15s var(--ease-spring);
+  box-shadow: 0 2px 8px rgba(0,122,255,0.25);
+}
+.sidebar-new-btn:hover {
+  background: var(--accent-hover);
+  transform: scale(1.05);
+}
+.sidebar-new-btn:active {
+  transform: scale(0.95);
+}
+
+.sidebar-search {
+  margin: 4px 12px 8px;
+  position: relative;
+}
+
+.sidebar-search input {
+  width: 100%;
+  height: 28px;
+  padding: 0 10px 0 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--bg-quaternary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  outline: none;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.sidebar-search input::placeholder {
+  color: var(--text-tertiary);
+}
+.sidebar-search input:focus {
+  background: var(--bg-tertiary);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.sidebar-search svg {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 13px;
+  height: 13px;
+  color: var(--text-tertiary);
+}
+
+.sidebar-section-label {
+  padding: 8px 16px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+}
+
+.sidebar-list::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-list::-webkit-scrollbar-thumb {
+  background: var(--text-quaternary);
+  border-radius: 2px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin: 1px 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-item:hover {
+  background: var(--bg-quaternary);
+}
+.sidebar-item.active {
+  background: var(--accent-tertiary);
+  color: var(--accent);
+  font-weight: 500;
+}
+.sidebar-item .item-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.sidebar-item.active .item-icon { opacity: 1; }
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sidebar-footer-btn {
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.1s, color 0.1s;
+}
+.sidebar-footer-btn:hover {
+  background: var(--bg-quaternary);
+  color: var(--text-primary);
+}
+
+/* ═══════════════════════════════════════════
+   Main Content Area
+   ═══════════════════════════════════════════ */
+.main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  position: relative;
+}
+
+/* ── Top Bar (macOS Title Bar Style) ── */
+.top-bar {
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  gap: 8px;
+  -webkit-app-region: drag;
+}
+
+html.dark .top-bar {
+  background: rgba(30,30,30,0.72);
+}
+
+.top-bar-trailing {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}
+
+.top-bar-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+.top-bar-btn:hover {
+  background: var(--bg-quaternary);
+  color: var(--text-primary);
+}
+.top-bar-btn:active {
+  background: var(--border);
+}
+
+.top-bar-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  flex: 1;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Traffic Lights — macOS Style Window Controls */
+.traffic-lights {
+  display: flex;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+.traffic-light {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.traffic-light:hover { opacity: 0.8; }
+.traffic-light.close { background: #ff5f57; }
+.traffic-light.minimize { background: #febc2e; }
+.traffic-light.maximize { background: #28c840; }
+html:not(.dark) .traffic-lights { border: 1px solid rgba(0,0,0,0.08); }
+
+/* ═══════════════════════════════════════════
+   Empty State / Home — Apple Card Style
+   ═══════════════════════════════════════════ */
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 40px 20px;
+}
+
+.home-container {
+  width: 100%;
+  max-width: 720px;
+}
+
+/* Apple Hero — centered with large text */
+.home-hero {
+  text-align: center;
+  padding: 60px 0 40px;
+}
+
+.home-hero .hero-symbol {
+  font-size: 48px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+.home-hero h1 {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.home-hero .subtitle {
+  font-size: 17px;
+  color: var(--text-secondary);
+  font-weight: 400;
+  max-width: 400px;
+  margin: 0 auto 32px;
+  line-height: 1.5;
+}
+
+/* Typewriter caret */
+.typewriter-caret {
+  animation: caret-blink 1.05s step-end infinite;
+}
+@keyframes caret-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* CTA Button — Apple Primary Button */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 28px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all 0.2s var(--ease-standard);
+  box-shadow: 0 4px 14px rgba(0,122,255,0.3);
+  letter-spacing: -0.01em;
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 6px 20px rgba(0,122,255,0.35);
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 8px rgba(0,122,255,0.25);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Recent Work Cards — Apple Card List */
+.recent-section h2 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+}
+
+.recent-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-standard);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.recent-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.recent-card:active {
+  transform: translateY(0) scale(0.99);
+  box-shadow: var(--shadow-sm);
+}
+
+.recent-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--accent-tertiary);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.recent-card-content {
+  flex: 1;
+  min-width: 0;
+}
+.recent-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.recent-card-summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent-card-time {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════
+   Chat View — Apple Message Style
+   ═══════════════════════════════════════════ */
+.chat-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 0;
+}
+.chat-messages::-webkit-scrollbar { width: 4px; }
+.chat-messages::-webkit-scrollbar-thumb {
+  background: var(--text-quaternary);
+  border-radius: 2px;
+}
+
+.message-wrapper {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 20px;
+  animation: message-in 0.3s var(--ease-decelerate);
+}
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* User Message — Apple iMessage Bubble */
+.message-user {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.message-user .bubble {
+  background: var(--accent);
+  color: white;
+  border-radius: var(--radius-lg);
+  border-bottom-right-radius: 4px;
+  padding: 10px 16px;
+  max-width: 65%;
+  font-size: 14px;
+  line-height: 1.55;
+  box-shadow: 0 1px 4px rgba(0,122,255,0.2);
+}
+
+/* Assistant Message — Apple Card Bubble */
+.message-assistant {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.message-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.message-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.message-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  border-top-left-radius: 4px;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.message-timestamp {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+  padding-left: 2px;
+}
+
+/* Tool Call / Result — Apple Collapsible Section */
+.tool-section {
+  margin: 8px 0;
+}
+
+.tool-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: background 0.1s;
+}
+.tool-header:hover {
+  background: var(--bg-quaternary);
+}
+
+.tool-header .tool-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+.tool-body {
+  margin-top: 4px;
+  padding: 10px 14px;
+  background: var(--bg-quaternary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  overflow-x: auto;
+}
+
+/* Streaming Indicator — Apple-style pulsing */
+.streaming-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 760px;
+  margin: 0 auto;
+  padding-left: 20px;
+}
+.streaming-indicator .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: stream-dot-pulse 1.4s ease-in-out infinite;
+}
+.streaming-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+.streaming-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes stream-dot-pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.1); }
+}
+
+/* ═══════════════════════════════════════════
+   Chat Input — Apple Composition Bar
+   ═══════════════════════════════════════════ */
+.chat-input-area {
+  flex-shrink: 0;
+  padding: 12px 20px 16px;
+  background: linear-gradient(180deg, transparent 0%, var(--bg-primary) 20%);
+}
+
+.composer {
+  max-width: 760px;
+  margin: 0 auto;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+}
+.composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 8px 30px rgba(0,122,255,0.12), var(--shadow-lg);
+}
+
+.composer-inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px 10px 16px;
+}
+
+.composer textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  max-height: 160px;
+  min-height: 22px;
+  padding: 2px 0;
+}
+.composer textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.composer-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.composer-action-btn:hover {
+  background: var(--bg-quaternary);
+  color: var(--text-secondary);
+}
+.composer-action-btn:active {
+  transform: scale(0.9);
+}
+
+.composer-send-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,122,255,0.3);
+  transition: all 0.15s var(--ease-spring);
+}
+.composer-send-btn:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 12px rgba(0,122,255,0.35);
+  transform: scale(1.05);
+}
+.composer-send-btn:active {
+  transform: scale(0.92);
+}
+.composer-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.composer-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 4px;
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.composer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.composer-chip:hover {
+  background: var(--bg-quaternary);
+}
+
+/* ═══════════════════════════════════════════
+   Right Panel — Apple Sheet Style
+   ═══════════════════════════════════════════ */
+.right-panel {
+  width: 0;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg-secondary);
+  overflow: hidden;
+  transition: width 0.3s var(--ease-standard);
+}
+.right-panel.open {
+  width: 420px;
+}
+
+.right-panel-header {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  height: 44px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+
+.right-panel-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.right-panel-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: background 0.1s;
+}
+.right-panel-close:hover {
+  background: var(--border);
+}
+
+.right-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* ═══════════════════════════════════════════
+   Settings Page — Apple Settings Style
+   ═══════════════════════════════════════════ */
+.settings-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 20px;
+}
+
+.settings-container {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.settings-group {
+  margin-bottom: 28px;
+}
+.settings-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+  padding-left: 4px;
+}
+
+.settings-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-row-label {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.settings-row-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+/* Apple Toggle Switch */
+.toggle {
+  width: 44px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-strong);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.25s;
+  flex-shrink: 0;
+}
+.toggle.active {
+  background: var(--success);
+  border-color: var(--success);
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: white;
+  top: 1px;
+  left: 1px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  transition: transform 0.25s var(--ease-spring);
+}
+.toggle.active::after {
+  transform: translateX(18px);
+}
+
+/* Select / Picker */
+.picker {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.picker:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0,122,255,0.15);
+}
+
+/* ═══════════════════════════════════════════
+   Model Picker — Apple Segmented Control
+   ═══════════════════════════════════════════ */
+.model-selector {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  gap: 1px;
+}
+.model-option {
+  padding: 6px 14px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s var(--ease-standard);
+}
+.model-option:hover {
+  color: var(--text-primary);
+}
+.model-option.active {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ═══════════════════════════════════════════
+   Dropdown / Popover — Apple Style
+   ═══════════════════════════════════════════ */
+.popover {
+  position: fixed;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  z-index: 500;
+  animation: popover-in 0.2s var(--ease-decelerate);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+@keyframes popover-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.popover-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: background 0.08s;
+}
+.popover-item:hover {
+  background: var(--bg-quaternary);
+  color: var(--text-primary);
+}
+.popover-item.active {
+  color: var(--accent);
+  font-weight: 500;
+}
+.popover-item .check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.popover-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+.popover-label {
+  padding: 8px 14px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+/* ═══════════════════════════════════════════
+   Tabs — Apple Tab Bar Style
+   ═══════════════════════════════════════════ */
+.tab-bar {
+  display: flex;
+  gap: 2px;
+  padding: 0 12px;
+  height: 38px;
+  align-items: center;
+}
+.tab-item {
+  height: 100%;
+  padding: 0 14px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  position: relative;
+  transition: color 0.15s;
+  border-radius: 6px 6px 0 0;
+}
+.tab-item:hover {
+  color: var(--text-primary);
+  background: var(--bg-quaternary);
+}
+.tab-item.active {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+/* ═══════════════════════════════════════════
+   Notification Toast — Apple Style
+   ═══════════════════════════════════════════ */
+.toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 600;
+  animation: toast-in 0.35s var(--ease-decelerate);
+  max-width: 360px;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-12px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.toast-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast-text {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+/* ═══════════════════════════════════════════
+   Dark Mode Toggle — Apple Style
+   ═══════════════════════════════════════════ */
+.theme-toggle {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  border-radius: 15px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.3s;
+  overflow: hidden;
+}
+.theme-toggle.active {
+  background: #1c1c1e;
+}
+.theme-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  transition: transform 0.3s var(--ease-spring), background 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-toggle.active .theme-toggle-knob {
+  transform: translateX(22px);
+  background: #2c2c2e;
+}
+.theme-toggle-knob svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ═══════════════════════════════════════════
+   Utility / Demo Helpers
+   ═══════════════════════════════════════════ */
+.demo-note {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  padding: 8px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  z-index: 100;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 20px 0;
+}
+
+/* ═══════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    z-index: 300;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    box-shadow: var(--shadow-xl);
+  }
+  .right-panel.open {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    z-index: 300;
+  }
+}
+</style>
+</head>
+<body>
+<div class="app-shell" id="app">
+
+  <!-- ═══════════════════════════════════════
+       LEFT SIDEBAR
+       ═══════════════════════════════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="pi-symbol">π</div>
+        <span>Pi</span>
+      </div>
+      <button class="sidebar-new-btn" title="New Session">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+
+    <div class="sidebar-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Search sessions…">
+    </div>
+
+    <div class="sidebar-section-label">Today</div>
+    <div class="sidebar-list">
+      <div class="sidebar-item active">
+        <svg class="item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Optimize React rendering
+      </div>
+      <div class="sidebar-item">
+        <svg class="item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Refactor auth middleware
+      </div>
+      <div class="sidebar-item">
+        <svg class="item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Add dark mode support
+      </div>
+    </div>
+
+    <div class="sidebar-section-label">Yesterday</div>
+    <div class="sidebar-list">
+      <div class="sidebar-item">
+        <svg class="item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Setup project scaffold
+      </div>
+      <div class="sidebar-item">
+        <svg class="item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Initial project creation
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="sidebar-footer-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+      <button class="sidebar-footer-btn" onclick="toggleTheme()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════
+       MAIN CONTENT AREA
+       ═══════════════════════════════════════ -->
+  <main class="main-area">
+
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="traffic-lights">
+        <button class="traffic-light close"></button>
+        <button class="traffic-light minimize"></button>
+        <button class="traffic-light maximize"></button>
+      </div>
+      <span class="top-bar-title">Optimize React rendering</span>
+      <div class="top-bar-trailing">
+        <!-- Model Selector -->
+        <div class="model-selector" style="margin-right:8px;">
+          <button class="model-option active">Sonnet 4</button>
+          <button class="model-option">Opus</button>
+          <button class="model-option">Haiku</button>
+        </div>
+        <button class="top-bar-btn" title="File Panel">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button class="top-bar-btn" title="Share">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ═══ TAB BAR ═══ -->
+    <div class="tab-bar">
+      <button class="tab-item active">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Chat
+      </button>
+      <button class="tab-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Files
+      </button>
+      <button class="tab-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Activity
+      </button>
+    </div>
+
+    <!-- ═══ CHAT VIEW (shown when session active) ═══ -->
+    <div class="chat-view">
+      <div class="chat-messages">
+
+        <!-- User Message -->
+        <div class="message-wrapper">
+          <div class="message-user">
+            <div class="bubble">
+              How can I optimize my React component's rendering performance? I'm using Next.js with a lot of state updates.
+            </div>
+          </div>
+        </div>
+
+        <!-- Assistant Message -->
+        <div class="message-wrapper">
+          <div class="message-assistant">
+            <div class="message-avatar">π</div>
+            <div class="message-body">
+              <div class="message-content">
+                <p>Great question! Here are the key strategies for optimizing React rendering:</p>
+                <p style="margin-top:8px;"><strong>1. Memoization</strong><br>Use <code style="background:var(--bg-tertiary);padding:1px 5px;border-radius:4px;font-size:13px;font-family:var(--font-mono)">React.memo()</code> and <code style="background:var(--bg-tertiary);padding:1px 5px;border-radius:4px;font-size:13px;font-family:var(--font-mono)">useMemo()</code> to prevent unnecessary re-renders.</p>
+                <p style="margin-top:6px;"><strong>2. State Colocation</strong><br>Keep state as close as possible to where it's used. Avoid lifting state up more than necessary.</p>
+                <p style="margin-top:6px;"><strong>3. Virtualization</strong><br>For long lists, use windowing techniques to only render visible items.</p>
+                <p style="margin-top:6px;">Would you like me to examine your codebase and suggest specific optimizations?</p>
+              </div>
+              <div class="message-timestamp">Today at 2:34 PM</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tool Call Section -->
+        <div class="message-wrapper">
+          <div class="message-assistant">
+            <div class="message-avatar">π</div>
+            <div class="message-body">
+              <div class="tool-section">
+                <div class="tool-header">
+                  <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                  <span>read_file — src/components/AppShell.tsx</span>
+                  <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2 3.5 5 6.5 8 3.5"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Streaming indicator -->
+        <div class="streaming-indicator">
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <span style="margin-left:4px;">Thinking…</span>
+        </div>
+
+      </div>
+
+      <!-- Chat Input Area -->
+      <div class="chat-input-area">
+        <div class="composer">
+          <div class="composer-inner">
+            <textarea rows="1" placeholder="Ask Pi anything…"></textarea>
+            <div class="composer-actions">
+              <button class="composer-action-btn" title="Attach file">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <button class="composer-action-btn" title="Image upload">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </button>
+            </div>
+            <button class="composer-send-btn" title="Send">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+          <div class="composer-footer">
+            <span class="composer-chip">⚙ Default tools</span>
+            <span class="composer-chip">💭 Thinking: Auto</span>
+            <span class="composer-chip">🔒 Sonnet 4</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ═══ HOME VIEW (shown when no session) ═══ -->
+    <!-- This is shown when the chat view is replaced by home content -->
+    <div class="empty-state" id="homeView" style="display:none;">
+      <div class="home-container">
+        <div class="home-hero">
+          <div class="hero-symbol">π</div>
+          <h1>Pi Agent Web</h1>
+          <p class="subtitle" id="typewriterText"></p>
+          <button class="btn-primary" onclick="showChat()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Chat
+          </button>
+        </div>
+
+        <div class="divider"></div>
+
+        <section class="recent-section">
+          <h2>My Work</h2>
+          <div class="recent-card" onclick="showChat()">
+            <div class="recent-card-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            </div>
+            <div class="recent-card-content">
+              <div class="recent-card-title">Optimize React rendering</div>
+              <div class="recent-card-summary">How can I optimize my React component's rendering performance?…</div>
+            </div>
+            <div class="recent-card-time">2:34 PM</div>
+          </div>
+          <div class="recent-card">
+            <div class="recent-card-icon" style="background:rgba(88,86,214,0.1);color:var(--accent-secondary);">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="recent-card-content">
+              <div class="recent-card-title">Refactor auth middleware</div>
+              <div class="recent-card-summary">Review the authentication middleware implementation and…</div>
+            </div>
+            <div class="recent-card-time">Yesterday</div>
+          </div>
+          <div class="recent-card">
+            <div class="recent-card-icon" style="background:rgba(52,199,89,0.1);color:var(--success);">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <div class="recent-card-content">
+              <div class="recent-card-title">Add dark mode support</div>
+              <div class="recent-card-summary">Implement dark mode theming across the application with…</div>
+            </div>
+            <div class="recent-card-time">Yesterday</div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════
+       RIGHT PANEL (File Viewer)
+       ═══════════════════════════════════════ -->
+  <aside class="right-panel" id="rightPanel">
+    <div class="right-panel-header">
+      <span class="right-panel-title">AppShell.tsx</span>
+      <button class="right-panel-close" onclick="toggleRightPanel()">✕</button>
+    </div>
+    <div class="right-panel-content">
+      <pre style="font-family:var(--font-mono);font-size:12px;line-height:1.6;color:var(--text-secondary);white-space:pre-wrap;word-break:break-all;"><code>// AppShell.tsx — optimized
+export function AppShell() {
+  const [renderCount, setRenderCount] = useState(0);
+  
+  // Memoized selectors prevent child re-renders
+  const memoizedState = useMemo(
+    () => computeExpensiveValue(state),
+    [state]
+  );
+  
+  return (
+    &lt;div className="app"&gt;
+      &lt;MemoizedChild data={memoizedState} /&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+    </div>
+  </aside>
+
+</div>
+
+<!-- Toast Notification -->
+<div class="toast" id="toast" style="display:none;">
+  <div class="toast-icon">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+  <span class="toast-text">Session saved</span>
+</div>
+
+<div class="demo-note">
+  Click "New Chat" to toggle views · Toggle dark mode with 🌙 icon
+</div>
+
+<script>
+// ── Theme Toggle ──
+function toggleTheme() {
+  document.documentElement.classList.toggle('dark');
+}
+
+// ── View Switching ──
+const chatView = document.querySelector('.chat-view');
+const homeView = document.getElementById('homeView');
+const chatMessages = document.querySelector('.chat-messages');
+const chatInputArea = document.querySelector('.chat-input-area');
+
+function showChat() {
+  homeView.style.display = 'none';
+  chatView.style.display = 'flex';
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showHome() {
+  chatView.style.display = 'none';
+  homeView.style.display = 'flex';
+}
+
+// ── Right Panel Toggle ──
+function toggleRightPanel() {
+  document.getElementById('rightPanel').classList.toggle('open');
+}
+
+// ── Typewriter Effect ──
+const phrases = [
+  'Ask me anything.',
+  "Let's build something.",
+  'Explore your codebase.',
+  'Draft an email.',
+  'Summarize that paper.',
+  'Fix that bug.',
+  'Write a haiku.',
+];
+let phraseIdx = 0;
+let charIdx = 0;
+let deleting = false;
+let text = '';
+let caretOn = true;
+
+function typewrite() {
+  const el = document.getElementById('typewriterText');
+  if (!el) { setTimeout(typewrite, 2000); return; }
+
+  // Blink caret
+  caretOn = !caretOn;
+  el.innerHTML = text + '<span class="typewriter-caret">▌</span>';
+
+  const current = phrases[phraseIdx];
+
+  if (!deleting) {
+    text = current.slice(0, charIdx + 1);
+    charIdx++;
+    if (charIdx > current.length) {
+      deleting = true;
+      setTimeout(typewrite, 1500);
+      return;
+    }
+    setTimeout(typewrite, 55);
+  } else {
+    text = current.slice(0, charIdx - 1);
+    charIdx--;
+    if (charIdx < 0) {
+      deleting = false;
+      phraseIdx = (phraseIdx + 1) % phrases.length;
+      charIdx = 0;
+      text = '';
+      setTimeout(typewrite, 400);
+      return;
+    }
+    setTimeout(typewrite, 28);
+  }
+}
+
+// ── Toast ──
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.querySelector('.toast-text').textContent = msg;
+  toast.style.display = 'flex';
+  setTimeout(() => { toast.style.display = 'none'; }, 3000);
+}
+
+// ── Init ──
+showHome();
+setTimeout(typewrite, 500);
+
+// ── Sidebar item click ──
+document.querySelectorAll('.sidebar-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+    document.querySelector('.top-bar-title').textContent = item.textContent.trim();
+    showToast('Session opened');
+  });
+});
+
+// ── Model selector click ──
+document.querySelectorAll('.model-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.model-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+  });
+});
+
+// ── Tab bar click ──
+document.querySelectorAll('.tab-item').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+  });
+});
+
+// ── Sidebar new button → home view ──
+document.querySelector('.sidebar-new-btn').addEventListener('click', showHome);
+
+// ── Settings button → show toast ──
+document.querySelector('.sidebar-footer-btn').addEventListener('click', () => {
+  showToast('Settings panel coming soon');
+});
+
+// ── Composer send → toggle to chat ──
+document.querySelector('.composer textarea').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    const val = e.target.value.trim();
+    if (!val) return;
+
+    // Add user message
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper';
+    wrapper.innerHTML = `<div class="message-user"><div class="bubble">${val}</div></div>`;
+    chatMessages.appendChild(wrapper);
+
+    // Add streaming indicator
+    const stream = document.createElement('div');
+    stream.className = 'streaming-indicator';
+    stream.innerHTML = `<div class="dot"></div><div class="dot"></div><div class="dot"></div><span style="margin-left:4px;">Thinking…</span>`;
+    chatMessages.appendChild(stream);
+
+    e.target.value = '';
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Simulate response after delay
+    setTimeout(() => {
+      chatMessages.removeChild(stream);
+      const assistant = document.createElement('div');
+      assistant.className = 'message-wrapper';
+      assistant.innerHTML = `
+        <div class="message-assistant">
+          <div class="message-avatar">π</div>
+          <div class="message-body">
+            <div class="message-content">
+              <p>I received your message. This is a prototype — full AI responses aren't wired up yet.</p>
+            </div>
+            <div class="message-timestamp">Just now</div>
+          </div>
+        </div>`;
+      chatMessages.appendChild(assistant);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      showToast('Response received');
+    }, 2000);
+  }
+});
+</script>
+</body>
+</html>
