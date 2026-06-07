@@ -2,7 +2,7 @@ name: Publish to npm
 on:
   push:
     tags:
-      - "v0.7.0"
+      - "v*"
 
 jobs:
   publish:
@@ -16,4 +16,14 @@ jobs:
           node-version: "22"
           registry-url: https://registry.npmjs.org
       - run: npm ci
-      - run: echo "Workflow parses"
+      - name: Switch file: deps to registry
+        run: |
+          sed -i -E 's|"@earendil-works/pi-ai": "file:[^"]*"|"@earendil-works/pi-ai": "^0.78.0"|' package.json
+          sed -i -E 's|"@earendil-works/pi-coding-agent": "file:[^"]*"|"@earendil-works/pi-coding-agent": "^0.78.0"|' package.json
+          npm install --no-audit --no-fund
+      - run: node_modules/.bin/tsc --noEmit
+      - run: npm run test:run
+      - run: npm run build
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
