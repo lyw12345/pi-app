@@ -17,6 +17,14 @@ export async function POST(req: Request) {
   const rejected = requireApiAuth(req);
   if (rejected) return rejected;
 
+  // Kill running installs if client disconnects
+  const procs: import("node:child_process").ChildProcess[] = [];
+  req.signal.addEventListener("abort", () => {
+    for (const p of procs) {
+      try { p.kill("SIGKILL"); } catch { /* already dead */ }
+    }
+  });
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -24,7 +32,7 @@ export async function POST(req: Request) {
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
         } catch {
-          // controller may be closed if client disconnected
+          // Stream may be closed if client disconnected
         }
       };
 
@@ -32,6 +40,7 @@ export async function POST(req: Request) {
         return new Promise((resolve) => {
           send({ type: "step", label, command: [cmd, ...args].join(" ") });
           const proc = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
+          procs.push(proc);
           proc.stdout?.on("data", (chunk: Buffer) => {
             const text = chunk.toString();
             for (const line of text.split("\n")) {
@@ -46,10 +55,15 @@ export async function POST(req: Request) {
           });
           proc.on("error", (err) => {
             send({ type: "error", line: `${label} failed to start: ${err.message}` });
+            // Remove from procs list on completion
+            const idx = procs.indexOf(proc);
+            if (idx !== -1) procs.splice(idx, 1);
             resolve(1);
           });
           proc.on("close", (code) => {
             send({ type: "step-done", label, exitCode: code });
+            const idx = procs.indexOf(proc);
+            if (idx !== -1) procs.splice(idx, 1);
             resolve(code ?? 1);
           });
         });
