@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { runNpx } from "@/lib/npx";
 import { rejectUnsafeMutation } from "@/lib/local-request-guard";
 import { getAgentDir, usesIsolatedAgentDataDir } from "@/lib/agent-dir";
-import { listDirs, mirrorNewGlobalSkills } from "@/lib/skill-mirror";
+import { mirrorNamedGlobalSkills, parseInstalledSkillNames } from "@/lib/skill-mirror";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +25,9 @@ export async function POST(req: Request) {
     const args = ["skills", "add", pkg.trim(), "-y", "--agent", "pi"];
     if (isGlobal) args.push("-g");
 
-    // Snapshot the upstream global skills dir before the install so we can
-    // detect what was added and mirror it into the dev's data dir if needed.
     // The upstream CLI hardcodes global skills to ~/.pi/agent/skills, see
     // skills CLI: agents.pi.globalSkillsDir = join(home, ".pi/agent/skills").
     const upstreamGlobalSkillsDir = join(homedir(), ".pi", "agent", "skills");
-    const before = isGlobal ? new Set(await listDirs(upstreamGlobalSkillsDir)) : new Set<string>();
     // Ensure the dir exists so the upstream CLI can write into it on first install.
     if (isGlobal && !existsSync(upstreamGlobalSkillsDir)) {
       await mkdir(upstreamGlobalSkillsDir, { recursive: true });
@@ -49,15 +46,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: output.slice(-300) || "Install failed" }, { status: 500 });
     }
 
-    // Mirror the new skill(s) into the dev agent dir if it differs from the
-    // upstream default. On prod these paths are identical, so this is a no-op.
+    // Mirror the install's actually-created skills into the dev agent dir.
+    // On prod these paths are identical, so this is a no-op.
     let mirrored: string[] = [];
     if (isGlobal && usesIsolatedAgentDataDir()) {
-      const targetDir = join(getAgentDir(), "skills");
-      await mkdir(targetDir, { recursive: true });
-      mirrored = await mirrorNewGlobalSkills(upstreamGlobalSkillsDir, targetDir, before);
-      if (mirrored.length > 0) {
-        console.log(`[skills/install] mirrored global skills into ${targetDir}: ${mirrored.join(", ")}`);
+      const installedNames = parseInstalledSkillNames(output);
+      if (installedNames.length > 0) {
+        const targetDir = join(getAgentDir(), "skills");
+        await mkdir(targetDir, { recursive: true });
+        mirrored = await mirrorNamedGlobalSkills(
+          upstreamGlobalSkillsDir,
+          targetDir,
+          installedNames,
+        );
+        if (mirrored.length > 0) {
+          console.log(
+            `[skills/install] mirrored global skills into ${targetDir}: ${mirrored.join(", ")}`,
+          );
+        }
       }
     }
 
