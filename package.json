@@ -1,10 +1,18 @@
 {
-  "name": "@agegr/pi-web",
-  "version": "0.7.0",
+  "name": "pi-app",
+  "version": "0.7.1",
   "description": "Web UI for the pi coding agent",
   "license": "MIT",
+  "homepage": "https://github.com/asiachrispy/pi-app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asiachrispy/pi-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/asiachrispy/pi-app/issues"
+  },
   "bin": {
-    "pi-web": "bin/pi-web.js"
+    "pi-app": "bin/pi-app.js"
   },
   "files": [
     "bin",
