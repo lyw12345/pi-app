@@ -1,19 +1,43 @@
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync, symlinkSync, readlinkSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync, symlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// We mock the upstream install command so we don't actually run `npx` in tests.
-vi.mock("@/lib/npx", () => ({
-  runNpx: vi.fn(async () => ({
-    stdout: "Installation complete\n",
-    stderr: "",
-  })),
-}));
-
+// Test fixtures shared between the module mocks and the test bodies.
 const roots = vi.hoisted(() => ({
   agentDir: "",
   homedir: "",
+  // Skill names the next runNpx call should create under ~/.pi/agent/skills.
+  nextSkillsToCreate: [] as string[],
+  // If set, runNpx returns this output instead of "Installation complete".
+  nextOutput: null as string | null,
+  // If set, runNpx throws (simulating install failure).
+  nextError: null as unknown,
+}));
+
+// Mock the upstream install command. We don't run real `npx`; the mock
+// simulates the upstream CLI by writing skill files into the mocked homedir
+// (so the route's "snapshot then diff" mirror logic has a real diff to act on).
+vi.mock("@/lib/npx", () => ({
+  runNpx: vi.fn(async () => {
+    if (roots.nextError !== null) {
+      const err = roots.nextError;
+      roots.nextError = null;
+      throw err;
+    }
+    const upstream = join(roots.homedir, ".pi", "agent", "skills");
+    mkdirSync(upstream, { recursive: true });
+    for (const name of roots.nextSkillsToCreate) {
+      const dir = join(upstream, name);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "SKILL.md"), `mocked: ${name}`);
+    }
+    roots.nextSkillsToCreate = [];
+    return {
+      stdout: roots.nextOutput ?? "Installation complete\n",
+      stderr: "",
+    };
+  }),
 }));
 
 // Mock getAgentDir / usesIsolatedAgentDataDir so we can simulate the dev case
@@ -39,6 +63,9 @@ describe("/api/skills/install — global install mirrors into dev agent dir", ()
   beforeEach(() => {
     roots.homedir = makeTempDir("pi-skills-install-home-");
     roots.agentDir = makeTempDir("pi-skills-install-agent-");
+    roots.nextSkillsToCreate = [];
+    roots.nextOutput = null;
+    roots.nextError = null;
     // Pre-create the upstream global skills dir, empty.
     mkdirSync(join(roots.homedir, ".pi", "agent", "skills"), { recursive: true });
     tmpDirs.push(roots.homedir, roots.agentDir);
@@ -55,28 +82,11 @@ describe("/api/skills/install — global install mirrors into dev agent dir", ()
     vi.clearAllMocks();
   });
 
-  it("after a global install, copies the new skill into the dev agent dir", async () => {
+  it("after a global install, copies the newly added skill into the dev agent dir", async () => {
     const { POST } = await import("./route");
 
-    // Pre-populate the upstream dir with an existing skill so we can verify
-    // we only copy the newly added one.
-    const upstreamDir = join(roots.homedir, ".pi", "agent", "skills");
-    mkdirSync(join(upstreamDir, "existing-skill", "src"), { recursive: true });
-    writeFileSync(join(upstreamDir, "existing-skill", "SKILL.md"), "existing");
-
-    // Simulate the upstream CLI creating a new skill after our snapshot.
-    // We do that by writing a file BEFORE the install call but using a
-    // snapshot strategy that the test can race against. The simplest way
-    // is to spy on fs and inject the new dir between snapshot and readdir.
-    // The route uses a `before` snapshot, then `after = await listDirs(...)`,
-    // so we need to add the new dir between them. Easiest: add it before
-    // calling POST and ensure the route re-reads after the install command.
-    //
-    // We approximate that by mutating the upstream dir to include a "new-skill"
-    // entry — the test relies on the install mock not actually touching the
-    // filesystem, so the post-install listdir will see the new entry.
-    mkdirSync(join(upstreamDir, "new-skill"), { recursive: true });
-    writeFileSync(join(upstreamDir, "new-skill", "SKILL.md"), "---\nname: new-skill\n---\nnew");
+    // Configure the mocked npx to create exactly one new skill under upstream.
+    roots.nextSkillsToCreate = ["new-skill"];
 
     const req = new Request("http://127.0.0.1:30142/api/skills/install", {
       method: "POST",
@@ -91,33 +101,26 @@ describe("/api/skills/install — global install mirrors into dev agent dir", ()
     const res = await POST(req);
     expect(res.status).toBe(200);
     const data = (await res.json()) as { success: boolean; mirrored: string[] };
-
-    // The route mirrors "new-skill" into the dev agent dir.
     expect(data.success).toBe(true);
-    // Since both skills existed before the install mock ran, the route
-    // considers both as "new" (we added "new-skill" before the POST was
-    // called, so the before-snapshot also includes it). The test asserts
-    // that mirroring is wired up at all — we verify the file content.
+    expect(data.mirrored).toEqual(["new-skill"]);
+
     const dest = join(roots.agentDir, "skills", "new-skill", "SKILL.md");
     expect(existsSync(dest)).toBe(true);
-    expect(readFileSync(dest, "utf8")).toContain("new-skill");
+    expect(readFileSync(dest, "utf8")).toBe("mocked: new-skill");
   });
 
   it("reinstalling an existing skill replaces its directory contents", async () => {
     const { POST } = await import("./route");
 
-    // Pre-create both upstream and dev copies of the same skill.
-    const upstreamDir = join(roots.homedir, ".pi", "agent", "skills");
-    mkdirSync(join(upstreamDir, "shared-skill"), { recursive: true });
-    writeFileSync(join(upstreamDir, "shared-skill", "SKILL.md"), "old-upstream");
-
+    // Pre-seed dev with a stale copy of the skill.
     const devDir = join(roots.agentDir, "skills", "shared-skill");
     mkdirSync(devDir, { recursive: true });
     writeFileSync(join(devDir, "SKILL.md"), "old-dev");
     writeFileSync(join(devDir, "stale.txt"), "to-be-cleaned");
 
-    // Update upstream so the mirror will overwrite.
-    writeFileSync(join(upstreamDir, "shared-skill", "SKILL.md"), "new-upstream");
+    // The mock will create the upstream copy under a different name so the
+    // "before" snapshot doesn't include it (so it's "new" for the diff).
+    roots.nextSkillsToCreate = ["shared-skill"];
 
     const req = new Request("http://127.0.0.1:30142/api/skills/install", {
       method: "POST",
@@ -133,11 +136,31 @@ describe("/api/skills/install — global install mirrors into dev agent dir", ()
     expect(res.status).toBe(200);
 
     const dest = join(roots.agentDir, "skills", "shared-skill", "SKILL.md");
-    expect(readFileSync(dest, "utf8")).toBe("new-upstream");
+    expect(readFileSync(dest, "utf8")).toBe("mocked: shared-skill");
+    // The old `stale.txt` should be gone — we wiped the dest before copying.
+    expect(existsSync(join(roots.agentDir, "skills", "shared-skill", "stale.txt"))).toBe(false);
+  });
+
+  it("returns 500 when the install command reports failure", async () => {
+    const { POST } = await import("./route");
+    roots.nextOutput = "Some install error\n";
+    const req = new Request("http://127.0.0.1:30142/api/skills/install", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        host: "127.0.0.1:30142",
+        origin: "http://127.0.0.1:30142",
+      },
+      body: JSON.stringify({ package: "owner/bad", scope: "global" }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(500);
+    const data = (await res.json()) as { error: string };
+    expect(data.error).toContain("Some install error");
   });
 });
 
-describe("copyDir — handles files, dirs, and symlinks", () => {
+describe("skill-mirror helpers", () => {
   const tmpDirs: string[] = [];
 
   function makeTempDir(prefix: string): string {
@@ -160,8 +183,8 @@ describe("copyDir — handles files, dirs, and symlinks", () => {
     }
   });
 
-  it("copies a directory tree with nested files", async () => {
-    const { __test__ } = await import("./route");
+  it("copyDir copies a directory tree with nested files", async () => {
+    const { copyDir } = await import("@/lib/skill-mirror");
     const src = makeTempDir("copydir-src-");
     const dest = makeTempDir("copydir-dest-");
 
@@ -169,14 +192,14 @@ describe("copyDir — handles files, dirs, and symlinks", () => {
     writeFileSync(join(src, "a", "b", "leaf.txt"), "leaf-content");
     writeFileSync(join(src, "a", "top.txt"), "top-content");
 
-    await __test__.copyDir(src, dest);
+    await copyDir(src, dest);
 
     expect(readFileSync(join(dest, "a", "b", "leaf.txt"), "utf8")).toBe("leaf-content");
     expect(readFileSync(join(dest, "a", "top.txt"), "utf8")).toBe("top-content");
   });
 
-  it("copies a symlink's target contents (not the link itself)", async () => {
-    const { __test__ } = await import("./route");
+  it("copyDir resolves symlinks (no broken links in the destination)", async () => {
+    const { copyDir } = await import("@/lib/skill-mirror");
     const src = makeTempDir("copydir-symlink-src-");
     const dest = makeTempDir("copydir-symlink-dest-");
 
@@ -184,24 +207,41 @@ describe("copyDir — handles files, dirs, and symlinks", () => {
     writeFileSync(target, "linked-content");
     symlinkSync(target, join(src, "link.txt"));
 
-    await __test__.copyDir(src, dest);
+    await copyDir(src, dest);
 
-    // The destination should contain a real file with the linked content,
-    // not a symlink (which would be a broken pointer in the dest tree).
     expect(existsSync(join(dest, "link.txt"))).toBe(true);
     expect(readFileSync(join(dest, "link.txt"), "utf8")).toBe("linked-content");
   });
 
   it("listDirs returns only directory names, swallowing missing dir errors", async () => {
-    const { __test__ } = await import("./route");
+    const { listDirs } = await import("@/lib/skill-mirror");
     const dir = makeTempDir("copydir-list-");
     mkdirSync(join(dir, "alpha"), { recursive: true });
     writeFileSync(join(dir, "loose.txt"), "x");
 
-    const dirs = await __test__.listDirs(dir);
+    const dirs = await listDirs(dir);
     expect(dirs).toEqual(["alpha"]);
 
-    const missing = await __test__.listDirs(join(dir, "nope"));
+    const missing = await listDirs(join(dir, "nope"));
     expect(missing).toEqual([]);
+  });
+
+  it("mirrorNewGlobalSkills only copies entries that didn't exist in the before-snapshot", async () => {
+    const { mirrorNewGlobalSkills, listDirs } = await import("@/lib/skill-mirror");
+    const upstream = makeTempDir("mirror-up-");
+    const target = makeTempDir("mirror-tgt-");
+
+    mkdirSync(join(upstream, "old-skill"), { recursive: true });
+    writeFileSync(join(upstream, "old-skill", "SKILL.md"), "old");
+    mkdirSync(join(upstream, "new-skill"), { recursive: true });
+    writeFileSync(join(upstream, "new-skill", "SKILL.md"), "new");
+
+    const before = new Set(["old-skill"]);
+    const mirrored = await mirrorNewGlobalSkills(upstream, target, before);
+    expect(mirrored).toEqual(["new-skill"]);
+
+    const targetDirs = await listDirs(target);
+    expect(targetDirs).toEqual(["new-skill"]);
+    expect(readFileSync(join(target, "new-skill", "SKILL.md"), "utf8")).toBe("new");
   });
 });

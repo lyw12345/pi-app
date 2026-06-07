@@ -3,7 +3,10 @@ name: Publish to npm
 on:
   push:
     tags:
-      - "v*"
+      - v*
+      - v0.*
+      - v0.7.*
+      - v0.7.0
 
 jobs:
   publish:

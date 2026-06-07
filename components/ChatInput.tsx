@@ -109,6 +109,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [attachedFiles, setAttachedFiles] = useState<AttachedFilePath[]>([]);
   const [stagingFiles, setStagingFiles] = useState(false);
   const [attachFileError, setAttachFileError] = useState<string | null>(null);
+  // Auto-dismissing notice shown when the user pastes an image but the
+  // selected model doesn't accept image input. Distinct from `attachFileError`
+  // (file-picker failures) so the two flows don't trample each other.
+  const [imageUnsupportedNotice, setImageUnsupportedNotice] = useState<string | null>(null);
+  const imageUnsupportedTimerRef = useRef<number | null>(null);
   const [cursorPos, setCursorPos] = useState(0);
   const [slashHighlight, setSlashHighlight] = useState(0);
   const [exportingHtml, setExportingHtml] = useState(false);
@@ -308,6 +313,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setSlashHighlight(0);
   }, [slashCompletion?.query]);
 
+  // Cleanup the auto-dismiss timer on unmount to avoid setting state on a
+  // dead component if the user navigates away mid-toast.
+  useEffect(() => () => {
+    if (imageUnsupportedTimerRef.current !== null) {
+      window.clearTimeout(imageUnsupportedTimerRef.current);
+      imageUnsupportedTimerRef.current = null;
+    }
+  }, []);
+
   const syncCursor = useCallback(() => {
     const ta = textareaRef.current;
     if (ta) setCursorPos(ta.selectionStart ?? ta.value.length);
@@ -424,7 +438,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     e.preventDefault();
     if (!supportsImages) {
       // Surface a transient error so the user knows *why* their paste was dropped.
-      setAttachFileError(t("chatInput.imagesNotSupported"));
+      // Use a separate, auto-dismissing state so it doesn't get stuck on screen.
+      setImageUnsupportedNotice(t("chatInput.imagesNotSupported"));
+      if (imageUnsupportedTimerRef.current !== null) {
+        window.clearTimeout(imageUnsupportedTimerRef.current);
+      }
+      imageUnsupportedTimerRef.current = window.setTimeout(() => {
+        setImageUnsupportedNotice(null);
+        imageUnsupportedTimerRef.current = null;
+      }, 4000);
       return;
     }
     const files = imageItems.map((item) => item.getAsFile()).filter((f): f is File => f !== null);
@@ -518,6 +540,25 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             borderRadius: 6, fontSize: 12, color: "rgba(220,80,80,0.95)",
           }}>
             {attachFileError}
+          </div>
+        )}
+        {imageUnsupportedNotice && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              marginBottom: 8, padding: "5px 10px",
+              background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.25)",
+              borderRadius: 6, fontSize: 12, color: "rgba(180,130,0,0.95)",
+              display: "flex", alignItems: "center", gap: 6,
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            {imageUnsupportedNotice}
           </div>
         )}
         {retryInfo && (
