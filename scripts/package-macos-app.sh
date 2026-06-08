@@ -210,7 +210,9 @@ rsync -a \
 
 embed_node
 install_production_deps
-chmod +x "$PI_WEB_RES/bin/pi-web.js" 2>/dev/null || true
+chmod +x "$PI_WEB_RES/bin/pi-app.js" 2>/dev/null || true
+# Compat symlink for any older Swift build that still looks up the old name.
+ln -sf pi-app.js "$PI_WEB_RES/bin/pi-web.js"
 
 if [[ ! -d "$PI_WEB_RES/node_modules/next" ]]; then
   echo "error: next not found under bundle node_modules" >&2

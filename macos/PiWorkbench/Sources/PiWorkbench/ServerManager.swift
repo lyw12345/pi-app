@@ -68,7 +68,7 @@ final class ServerManager: ObservableObject {
       state = .ready
     } else {
       stop()
-      state = .failed("pi-web 在 60 秒内未就绪，请检查端口 \(port) 是否被占用")
+      state = .failed("pi-app 在 60 秒内未就绪，请检查端口 \(port) 是否被占用")
     }
   }
 
@@ -105,7 +105,7 @@ final class ServerManager: ObservableObject {
     }
     let alert = NSAlert()
     alert.messageText = "Pi Workbench"
-    alert.informativeText = "pi-web \(piWebVersion)\n@mariozechner/pi-coding-agent \(piVersion)"
+    alert.informativeText = "pi-app \(piWebVersion)\n@mariozechner/pi-coding-agent \(piVersion)"
     alert.alertStyle = .informational
     alert.addButton(withTitle: "好")
     alert.runModal()
@@ -138,10 +138,10 @@ final class ServerManager: ObservableObject {
 
   /// Returns an error message on failure, nil on success.
   private func spawn() -> String? {
-    let script = piWebRoot.appendingPathComponent("bin/pi-web.js")
+    let script = piWebRoot.appendingPathComponent("bin/pi-app.js")
     let fm = FileManager.default
     guard fm.fileExists(atPath: script.path) else {
-      return "未找到 pi-web：\(script.path)\n请用 ditto 重新安装 Pi.app"
+      return "未找到 pi-app：\(script.path)\n请用 ditto 重新安装 Pi.app"
     }
     guard let nodeURL else {
       return "未找到 Node。请用最新 dist/macos/Pi.app 覆盖安装（内嵌 Node）"
@@ -164,7 +164,7 @@ final class ServerManager: ObservableObject {
       process = proc
       return nil
     } catch {
-      return "启动 pi-web 失败：\(error.localizedDescription)"
+      return "启动 pi-app 失败：\(error.localizedDescription)"
     }
   }
 
@@ -204,7 +204,7 @@ final class ServerManager: ObservableObject {
   private static func bundledPiWebRoot() -> URL? {
     guard let resources = resourcesURL() else { return nil }
     let root = resources.appendingPathComponent("pi-web", isDirectory: true)
-    let script = root.appendingPathComponent("bin/pi-web.js")
+    let script = root.appendingPathComponent("bin/pi-app.js")
     if FileManager.default.fileExists(atPath: script.path) {
       return root.standardizedFileURL
     }
@@ -243,7 +243,7 @@ final class ServerManager: ObservableObject {
       cwd,
     ]
     for url in candidates {
-      let script = url.appendingPathComponent("bin/pi-web.js")
+      let script = url.appendingPathComponent("bin/pi-app.js")
       if FileManager.default.fileExists(atPath: script.path) {
         return url.standardizedFileURL
       }
