@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useI18n } from "@/lib/i18n/provider";
 import { fetchWithTimeout, isConnectionError } from "@/lib/api-fetch";
-import { getProjectCwds } from "@/lib/session-projects";
+import { getPickerCwds } from "@/lib/session-projects";
 import type { SessionInfo } from "@/lib/types";
 import { FileExplorer } from "./FileExplorer";
 
@@ -307,7 +307,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
       }
 
       finishRestore(false);
-      const cwds = pickerProjectCwds.length > 0 ? pickerProjectCwds : getProjectCwds(allSessions);
+      const cwds = pickerProjectCwds.length > 0 ? pickerProjectCwds : getPickerCwds(allSessions);
       if (cwds.length > 0) setSelectedCwd(cwds[0]);
       return;
     }
@@ -415,7 +415,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   const projectCwds = useMemo(() => {
     const seen = new Set(pickerProjectCwds);
     const merged = [...pickerProjectCwds];
-    for (const cwd of getProjectCwds(allSessions)) {
+    for (const cwd of getPickerCwds(allSessions)) {
       if (!seen.has(cwd)) {
         seen.add(cwd);
         merged.push(cwd);

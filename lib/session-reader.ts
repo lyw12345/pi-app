@@ -6,7 +6,7 @@ import type { SessionEntry as PiSessionEntry, SessionInfo as PiSessionInfo } fro
 import { normalizeAgentMessage } from "./normalize";
 import { loadPiWebPreferences } from "./pi-web-preferences";
 import { readProductSessionMetadataMap } from "./scene-metadata";
-import { getProjectCwds } from "./session-projects";
+import { getPickerCwds, isSystemTempCwd } from "./session-projects";
 
 export { getAgentDir };
 
@@ -54,9 +54,13 @@ export async function listProjectCwdsForPicker(): Promise<string[]> {
     }
   }
 
-  const cwds = getProjectCwds(merged);
+  const cwds = getPickerCwds(merged);
   const defaultWorkspaceCwd = loadPiWebPreferences().defaultWorkspaceCwd?.trim();
-  if (defaultWorkspaceCwd && !cwds.includes(defaultWorkspaceCwd)) {
+  if (
+    defaultWorkspaceCwd &&
+    !cwds.includes(defaultWorkspaceCwd) &&
+    !isSystemTempCwd(defaultWorkspaceCwd)
+  ) {
     cwds.push(defaultWorkspaceCwd);
   }
   return cwds;
