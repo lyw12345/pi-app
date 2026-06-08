@@ -179,15 +179,30 @@ function PiAgentTitle() {
   return (
     <button
       onClick={handleClick}
+      aria-label={t("sessionSidebar.title")}
       style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
         background: "none", border: "none", padding: 0, cursor: "default",
-        fontWeight: 700, fontSize: 15, letterSpacing: 0,
         color: showVersion ? "var(--accent)" : "var(--text)",
-        fontFamily: "var(--font-mono)",
         minWidth: "6ch",
       }}
     >
-      {display}
+      {/* eslint-disable-next-line @next/next/no-img-element -- 24x24 fixed-size static icon, next/image is overkill */}
+      <img
+        src="/icon-192.png"
+        alt=""
+        width={24}
+        height={24}
+        style={{ display: "block", borderRadius: 6, flexShrink: 0 }}
+      />
+      <span
+        style={{
+          fontWeight: 700, fontSize: 15, letterSpacing: 0,
+          fontFamily: "var(--font-mono)",
+        }}
+      >
+        {display}
+      </span>
     </button>
   );
 }
