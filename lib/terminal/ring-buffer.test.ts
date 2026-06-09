@@ -39,14 +39,14 @@ describe("lineBytes", () => {
 
 describe("appendLine", () => {
   it("appends a line and updates bufferBytes", () => {
-    const s = makeSession(1024);
+    const s = makeSession();
     appendLine(s, output("hi"), 1024);
     expect(s.buffer).toHaveLength(1);
     expect(s.bufferBytes).toBe(lineBytes(output("hi")));
   });
 
   it("evicts oldest lines when cap is exceeded", () => {
-    const s = makeSession(100); // tight cap
+    const s = makeSession(); // tight cap
     appendLine(s, output("aaaaaaaaaa"), 100);   // ~42 bytes
     appendLine(s, output("bbbbbbbbbb"), 100);   // ~42 bytes
     appendLine(s, output("cccccccccc"), 100);   // forces eviction
@@ -59,7 +59,7 @@ describe("appendLine", () => {
   });
 
   it("emits a truncated info line after >=100KB cumulative drops", () => {
-    const s = makeSession(200);
+    const s = makeSession();
     const big = "x".repeat(80);
     // Track truncated lines seen during the loop (subsequent evictions
     // can remove them — the spec doesn't promise stickiness).
@@ -74,7 +74,7 @@ describe("appendLine", () => {
   });
 
   it("truncates a single output line in place when it alone exceeds the cap", () => {
-    const s = makeSession(100);
+    const s = makeSession();
     appendLine(s, output("x".repeat(500)), 100);
     expect(s.buffer).toHaveLength(1);
     const line = s.buffer[0] as Extract<TerminalLine, { kind: "output" }>;
