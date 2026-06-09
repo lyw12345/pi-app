@@ -5,6 +5,7 @@ import WebKit
 ///
 /// Shares the WKProcessPool with the main `PiWebView` so cookies and storage
 /// are shared. The fetcher is never visible to the user.
+@MainActor
 final class HiddenWebFetcher: NSObject, WKNavigationDelegate {
   private let webView: WKWebView
   private var continuation: CheckedContinuation<WebFetchResult, Error>?
