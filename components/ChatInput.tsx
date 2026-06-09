@@ -15,6 +15,7 @@ import {
 import { normalizeFilePathRef, type FilePathRef } from "@/lib/message-file-refs";
 import { pickFilePathsNative, stageFilesFromBrowser } from "@/lib/stage-uploaded-files";
 import { FileAttachmentChip } from "./FileAttachmentChip";
+import { OpenTerminalButton } from "./OpenTerminalButton";
 
 function displayCompactError(compactError: string | null, t: (key: TranslationKey) => string): string | null {
   if (!compactError) return null;
@@ -72,6 +73,7 @@ interface Props {
   slashCommands?: SlashCommandEntry[];
   onOpenSettings?: () => void;
   onOpenFile?: (filePath: string, fileName: string) => void;
+  onOpenTerminal?: () => void;
 }
 
 export interface ChatInputHandle {
@@ -97,6 +99,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   slashCommandsEnabled = false,
   slashCommands = [],
   onOpenFile,
+  onOpenTerminal,
 }: Props, ref) {
   const { t } = useI18n();
   const compactErrorLabel = displayCompactError(compactError ?? null, t);
@@ -1268,6 +1271,15 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 </svg>
                 {t("chatInput.stop")}
               </button>
+            )}
+
+            {onOpenTerminal && (
+              <div className="terminal-open-wrap">
+                <OpenTerminalButton
+                  hasCwd={!!sessionId}
+                  onClick={onOpenTerminal}
+                />
+              </div>
             )}
 
             {onSoundToggle !== undefined && (
