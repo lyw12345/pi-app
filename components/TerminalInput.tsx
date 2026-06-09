@@ -6,9 +6,9 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 
-export function TerminalInput({
+export const TerminalInput = memo(function TerminalInput({
   history,
   onSubmit,
   disabled,
@@ -80,10 +80,9 @@ export function TerminalInput({
         onKeyDown={onKeyDown}
         disabled={disabled}
         placeholder={disabled ? "Running…" : "$ type a command, ↑/↓ for history"}
-        autoFocus
         spellCheck={false}
         autoComplete="off"
       />
     </div>
   );
-}
+});

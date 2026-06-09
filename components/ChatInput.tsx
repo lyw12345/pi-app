@@ -73,7 +73,6 @@ interface Props {
   slashCommands?: SlashCommandEntry[];
   onOpenSettings?: () => void;
   onOpenFile?: (filePath: string, fileName: string) => void;
-  onOpenTerminal?: () => void;
 }
 
 export interface ChatInputHandle {
@@ -99,7 +98,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   slashCommandsEnabled = false,
   slashCommands = [],
   onOpenFile,
-  onOpenTerminal,
 }: Props, ref) {
   const { t } = useI18n();
   const compactErrorLabel = displayCompactError(compactError ?? null, t);
@@ -1273,16 +1271,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               </button>
             )}
 
-            {onOpenTerminal && (
-              <div className="terminal-open-wrap">
-                <OpenTerminalButton
-                  hasCwd={!!sessionId}
-                  onClick={onOpenTerminal}
-                />
-              </div>
-            )}
-
-            {onSoundToggle !== undefined && (
+{onSoundToggle !== undefined && (
               <button
                 onClick={onSoundToggle}
                 title={soundEnabled ? t("chatInput.soundOff") : t("chatInput.soundOn")}

@@ -32,7 +32,6 @@ interface Props {
   onOpenModels?: () => void;
   onOpenSettings?: () => void;
   onOpenFile?: (filePath: string, fileName: string) => void;
-  onOpenTerminal?: () => void;
 }
 
 function phaseLabel(phase: AgentPhase): string {
@@ -102,7 +101,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onBranchNavigatingChange, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, toolMode = "full", onOpenModels, onOpenSettings, onOpenFile, onOpenTerminal }: Props) {
+export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onBranchNavigatingChange, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, toolMode = "full", onOpenModels, onOpenSettings, onOpenFile }: Props) {
   const { t } = useI18n();
   const {
     loading, error, messages, entryIds, streamState,
@@ -302,7 +301,6 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       slashCommands={slashCommands}
       onOpenSettings={onOpenSettings}
       onOpenFile={onOpenFile}
-      onOpenTerminal={onOpenTerminal}
     />
   );
 

@@ -65,6 +65,15 @@ export function TerminalPanel({
     ? Math.floor((now - term.running.startedAt) / 1000)
     : null;
 
+  const handleSubmit = useCallback((cmd: string, kr: boolean) => {
+    void term.submit(cmd, kr);
+  }, [term.submit, cwd]);
+
+  const handleClose = useCallback(() => {
+    // go through onClose which is stable (setter from useState)
+    onClose();
+  }, [onClose]);
+
   return (
     <div
       className="terminal-panel"
@@ -79,7 +88,7 @@ export function TerminalPanel({
         aria-label="Resize terminal"
       />
       <div className="terminal-status-bar">
-        <span className="terminal-status-cwd" title={cwd}>📟 Terminal · {shortenPath(cwd)}</span>
+        <span className="terminal-status-cwd" title={cwd}>Terminal · {shortenPath(cwd)}</span>
         {term.running && (
           <>
             <span className="terminal-status-pid">PID {term.running.pid}</span>
@@ -92,15 +101,15 @@ export function TerminalPanel({
           </>
         )}
         {term.error && <span className="terminal-status-error">{term.error}</span>}
-        <button className="terminal-status-close" onClick={onClose} aria-label="Close terminal">
-          ✕
+        <button className="terminal-status-close" onClick={handleClose} aria-label="Close terminal">
+          Close
         </button>
       </div>
       <TerminalOutput lines={term.lines} />
       <TerminalInput
         history={term.history}
         disabled={!!term.running && !term.running.isKeepRunning}
-        onSubmit={(cmd, kr) => term.submit(cmd, kr)}
+        onSubmit={handleSubmit}
       />
     </div>
   );
