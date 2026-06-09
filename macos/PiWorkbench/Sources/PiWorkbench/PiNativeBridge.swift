@@ -2,6 +2,7 @@ import AppKit
 import UserNotifications
 import WebKit
 
+@MainActor
 final class PiNativeBridge: NSObject, WKScriptMessageHandler {
   weak var webView: WKWebView?
   private let hiddenFetcher = HiddenWebFetcher()
