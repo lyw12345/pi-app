@@ -1,35 +1,47 @@
 // components/TerminalInput.tsx
 //
-// Single-line input with Enter-to-submit, ↑/↓ history navigation, and a
-// keep-running checkbox that resets after each submit. Shift+Enter is
-// captured (no newline) — multi-line commands are out of scope in v1.
+// Inline terminal prompt input. The input is rendered as the final line in
+// the scrollback area (prompt + editable command), matching common zsh-like
+// terminal interaction instead of a separate form field.
 
 "use client";
 
-import { useState, memo } from "react";
+import { useEffect, useRef, useState, memo } from "react";
 
 export const TerminalInput = memo(function TerminalInput({
   history,
   onSubmit,
   disabled,
+  open = true,
+  prompt,
 }: {
   history: string[];
-  onSubmit: (command: string, keepRunning: boolean) => Promise<void> | void;
+  onSubmit: (command: string) => Promise<void> | void;
   disabled: boolean;
+  open?: boolean;
+  prompt: string;
 }) {
   const [value, setValue] = useState("");
   const [historyIdx, setHistoryIdx] = useState(-1);
-  const [keepRunning, setKeepRunning] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const previousFocusState = useRef({ disabled: true, open: false });
+
+  useEffect(() => {
+    const previous = previousFocusState.current;
+    previousFocusState.current = { disabled, open };
+    if (!open || disabled) return;
+    if (!previous.open || previous.disabled) {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [disabled, open]);
 
   const submit = async () => {
     const cmd = value.trim();
     if (!cmd) return;
-    const kr = keepRunning;
     setValue("");
     setHistoryIdx(-1);
-    setKeepRunning(false);
     try {
-      await onSubmit(cmd, kr);
+      await onSubmit(cmd);
     } catch {
       // surface error in parent (terminal output already shows server-side errors)
     }
@@ -62,24 +74,19 @@ export const TerminalInput = memo(function TerminalInput({
   };
 
   return (
-    <div className="terminal-input">
-      <label className="keep-running-toggle">
-        <input
-          type="checkbox"
-          checked={keepRunning}
-          onChange={(e) => setKeepRunning(e.target.checked)}
-          disabled={disabled}
-        />
-        keep running
-      </label>
+    <div className="terminal-input-line" onMouseDown={() => inputRef.current?.focus()}>
+      <span className="terminal-prompt">{prompt}</span>
+      <span className="terminal-input-spacer"> </span>
       <input
+        ref={inputRef}
         className="terminal-input-field"
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={onKeyDown}
         disabled={disabled}
-        placeholder={disabled ? "Running…" : "$ type a command, ↑/↓ for history"}
+        aria-label="Terminal command"
+        placeholder={disabled ? "running…" : ""}
         spellCheck={false}
         autoComplete="off"
       />

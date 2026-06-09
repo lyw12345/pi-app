@@ -14,6 +14,7 @@ export type UseTerminalResult = {
   lines: TerminalLine[];
   history: string[];
   running: RunningProcessSummary | null;
+  prompt: string;
   isLoading: boolean;
   error: string | null;
   submit(command: string, keepRunning: boolean): Promise<void>;
@@ -34,6 +35,7 @@ export function useTerminal(cwd: string | null, enabled: boolean): UseTerminalRe
   const [lines, setLines] = useState<TerminalLine[]>([]);
   const [history, setHistory] = useState<string[]>([]);
   const [running, setRunning] = useState<RunningProcessSummary | null>(null);
+  const [prompt, setPrompt] = useState(() => fallbackPrompt(cwd));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const esRef = useRef<EventSource | null>(null);
@@ -47,6 +49,7 @@ export function useTerminal(cwd: string | null, enabled: boolean): UseTerminalRe
       setLines([]);
       setHistory([]);
       setRunning(null);
+      setPrompt(fallbackPrompt(cwd));
       setIsLoading(false);
       setError(null);
       return;
@@ -61,8 +64,9 @@ export function useTerminal(cwd: string | null, enabled: boolean): UseTerminalRe
         if (!r.ok) throw new Error(`state ${r.status}`);
         return r.json();
       })
-      .then((body: { buffer: TerminalLine[]; history: string[]; running: RunningProcessSummary | null }) => {
+      .then((body: { prompt?: string; buffer: TerminalLine[]; history: string[]; running: RunningProcessSummary | null }) => {
         if (cwdRef.current !== cwd) return; // cwd changed during fetch
+        setPrompt(body.prompt ?? fallbackPrompt(cwd));
         setLines(body.buffer);
         setHistory(body.history);
         setRunning(body.running);
@@ -133,5 +137,13 @@ export function useTerminal(cwd: string | null, enabled: boolean): UseTerminalRe
     setLines([]);
   }, []);
 
-  return { lines, history, running, isLoading, error, submit, stop, clear };
+  return { lines, history, running, prompt, isLoading, error, submit, stop, clear };
+}
+
+function fallbackPrompt(cwd: string | null): string {
+  if (!cwd) return "terminal %";
+  const parts = cwd.split("/").filter(Boolean);
+  const dir = parts.at(-1) ?? cwd;
+  const user = parts[0] === "Users" && parts[1] ? parts[1] : "user";
+  return `${user}@localhost ${dir} %`;
 }

@@ -15,7 +15,6 @@ import {
 import { normalizeFilePathRef, type FilePathRef } from "@/lib/message-file-refs";
 import { pickFilePathsNative, stageFilesFromBrowser } from "@/lib/stage-uploaded-files";
 import { FileAttachmentChip } from "./FileAttachmentChip";
-import { OpenTerminalButton } from "./OpenTerminalButton";
 
 function displayCompactError(compactError: string | null, t: (key: TranslationKey) => string): string | null {
   if (!compactError) return null;

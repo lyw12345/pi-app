@@ -11,16 +11,28 @@ import { TerminalPanel } from "./TerminalPanel";
 
 const mockUseTerminal = useTerminal as unknown as ReturnType<typeof vi.fn>;
 
+function terminalReturn(overrides: Record<string, unknown> = {}) {
+  return {
+    lines: [],
+    history: [],
+    running: null,
+    prompt: "mk@host proj %",
+    isLoading: false,
+    error: null,
+    submit: vi.fn(),
+    stop: vi.fn(),
+    clear: vi.fn(),
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   mockUseTerminal.mockReset();
 });
 
 describe("TerminalPanel", () => {
   it("renders nothing visible when open is false", () => {
-    mockUseTerminal.mockReturnValue({
-      lines: [], history: [], running: null, isLoading: false, error: null,
-      submit: vi.fn(), stop: vi.fn(), clear: vi.fn(),
-    });
+    mockUseTerminal.mockReturnValue(terminalReturn());
     const { container } = render(
       <TerminalPanel cwd="/tmp/proj" open={false} height={0.4} onClose={vi.fn()} onHeightChange={vi.fn()} />,
     );
@@ -28,27 +40,22 @@ describe("TerminalPanel", () => {
     expect((container.firstChild as HTMLElement).style.display).toBe("none");
   });
 
-  it("renders status bar with cwd when open", () => {
-    mockUseTerminal.mockReturnValue({
-      lines: [], history: [], running: null, isLoading: false, error: null,
-      submit: vi.fn(), stop: vi.fn(), clear: vi.fn(),
-    });
+  it("renders status bar with cwd and inline prompt when open", () => {
+    mockUseTerminal.mockReturnValue(terminalReturn());
     const { container } = render(
       <TerminalPanel cwd="/tmp/proj" open={true} height={0.4} onClose={vi.fn()} onHeightChange={vi.fn()} />,
     );
-    // The status bar shows a 📟 glyph plus the last 2 components of the cwd
     expect(container.textContent).toMatch(/Terminal/);
     expect(container.textContent).toMatch(/tmp\/proj/);
+    expect(container.textContent).toMatch(/mk@host proj %/);
   });
 
   it("shows Stop button when running and keepRunning=true; click triggers stop()", () => {
     const stop = vi.fn().mockResolvedValue(undefined);
-    mockUseTerminal.mockReturnValue({
-      lines: [], history: [],
+    mockUseTerminal.mockReturnValue(terminalReturn({
       running: { pid: 12345, command: "tail -f", startedAt: Date.now(), isKeepRunning: true },
-      isLoading: false, error: null,
-      submit: vi.fn(), stop, clear: vi.fn(),
-    });
+      stop,
+    }));
     const { container } = render(
       <TerminalPanel cwd="/tmp/proj" open={true} height={0.4} onClose={vi.fn()} onHeightChange={vi.fn()} />,
     );
@@ -59,12 +66,9 @@ describe("TerminalPanel", () => {
   });
 
   it("input is disabled when running and not keepRunning", () => {
-    mockUseTerminal.mockReturnValue({
-      lines: [], history: [],
+    mockUseTerminal.mockReturnValue(terminalReturn({
       running: { pid: 1, command: "x", startedAt: Date.now(), isKeepRunning: false },
-      isLoading: false, error: null,
-      submit: vi.fn(), stop: vi.fn(), clear: vi.fn(),
-    });
+    }));
     const { container } = render(
       <TerminalPanel cwd="/tmp/proj" open={true} height={0.4} onClose={vi.fn()} onHeightChange={vi.fn()} />,
     );

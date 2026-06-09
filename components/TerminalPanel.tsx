@@ -28,6 +28,7 @@ export function TerminalPanel({
   const term = useTerminal(cwd, open);
   const [dragging, setDragging] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [keepRunning, setKeepRunning] = useState(false);
   const startY = useRef(0);
   const startH = useRef(height);
 
@@ -65,9 +66,12 @@ export function TerminalPanel({
     ? Math.floor((now - term.running.startedAt) / 1000)
     : null;
 
-  const handleSubmit = useCallback((cmd: string, kr: boolean) => {
-    void term.submit(cmd, kr);
-  }, [term.submit, cwd]);
+  const submitCommand = term.submit;
+  const handleSubmit = useCallback((cmd: string) => {
+    const shouldKeepRunning = keepRunning;
+    setKeepRunning(false);
+    void submitCommand(cmd, shouldKeepRunning);
+  }, [keepRunning, submitCommand]);
 
   const handleClose = useCallback(() => {
     // go through onClose which is stable (setter from useState)
@@ -101,16 +105,29 @@ export function TerminalPanel({
           </>
         )}
         {term.error && <span className="terminal-status-error">{term.error}</span>}
+        <span className="terminal-status-spacer" />
+        <label className="terminal-keep-running-toggle" title="Run command as a long-running process that can be stopped">
+          <input
+            type="checkbox"
+            checked={keepRunning}
+            onChange={(e) => setKeepRunning(e.target.checked)}
+            disabled={!!term.running && !term.running.isKeepRunning}
+          />
+          keep
+        </label>
         <button className="terminal-status-close" onClick={handleClose} aria-label="Close terminal">
           Close
         </button>
       </div>
-      <TerminalOutput lines={term.lines} />
-      <TerminalInput
-        history={term.history}
-        disabled={!!term.running && !term.running.isKeepRunning}
-        onSubmit={handleSubmit}
-      />
+      <TerminalOutput lines={term.lines} prompt={term.prompt}>
+        <TerminalInput
+          history={term.history}
+          disabled={!!term.running && !term.running.isKeepRunning}
+          open={open}
+          prompt={term.prompt}
+          onSubmit={handleSubmit}
+        />
+      </TerminalOutput>
     </div>
   );
 }

@@ -27,7 +27,7 @@ beforeEach(() => {
     if (typeof url !== "string") return new Response("not found", { status: 404 });
     if (url.includes("/state/")) {
       const session = getTerminalManager().getOrCreate("/tmp/proj-hook");
-      return new Response(JSON.stringify({ buffer: session.buffer, history: [], running: null }), {
+      return new Response(JSON.stringify({ prompt: "mk@host proj %", buffer: session.buffer, history: [], running: null }), {
         status: 200, headers: { "content-type": "application/json" },
       });
     }
@@ -54,6 +54,7 @@ describe("useTerminal", () => {
     const fetchCalls = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c: unknown[]) => String(c[0]));
     expect(fetchCalls.some((u: string) => u.includes("/state/"))).toBe(true);
     expect(result.current.running).toBeNull();
+    await waitFor(() => expect(result.current.prompt).toBe("mk@host proj %"));
     expect(result.current.lines).toEqual([]);
   });
 

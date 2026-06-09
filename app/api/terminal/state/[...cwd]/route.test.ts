@@ -36,6 +36,7 @@ describe("GET /api/terminal/state/[...cwd]", () => {
     const res = await GET(req as unknown as import("next/server").NextRequest, { params: Promise.resolve({ cwd: [tmpCwd] }) } as unknown as { params: Promise<{ cwd: string[] }> });
     expect(res.status).toBe(200);
     const body = await res.json();
+    expect(body.prompt).toMatch(/%$/);
     expect(body.buffer).toEqual([]);
     expect(body.history).toEqual([]);
     expect(body.running).toBeNull();

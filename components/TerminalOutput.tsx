@@ -6,12 +6,20 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { TerminalLine } from "@/lib/terminal/types";
 
 const AUTOSCROLL_THRESHOLD_PX = 30;
 
-export function TerminalOutput({ lines }: { lines: TerminalLine[] }) {
+export function TerminalOutput({
+  lines,
+  prompt,
+  children,
+}: {
+  lines: TerminalLine[];
+  prompt: string;
+  children?: ReactNode;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
@@ -19,7 +27,7 @@ export function TerminalOutput({ lines }: { lines: TerminalLine[] }) {
     const el = ref.current;
     if (!el || !autoScroll) return;
     el.scrollTop = el.scrollHeight;
-  }, [lines, autoScroll]);
+  }, [lines, autoScroll, children]);
 
   const onScroll = () => {
     const el = ref.current!;
@@ -30,8 +38,9 @@ export function TerminalOutput({ lines }: { lines: TerminalLine[] }) {
   return (
     <div ref={ref} className="terminal-output" onScroll={onScroll}>
       {lines.map((line, i) => (
-        <Line key={i} line={line} />
+        <Line key={i} line={line} prompt={prompt} />
       ))}
+      {children}
       {!autoScroll && (
         <button
           className="jump-to-bottom"
@@ -48,21 +57,19 @@ export function TerminalOutput({ lines }: { lines: TerminalLine[] }) {
   );
 }
 
-function Line({ line }: { line: TerminalLine }) {
+function Line({ line, prompt }: { line: TerminalLine; prompt: string }) {
   switch (line.kind) {
     case "command":
-      return <div className="line-cmd">$ {line.text}</div>;
+      return (
+        <div className="line-cmd terminal-command-line">
+          <span className="terminal-prompt">{prompt}</span>
+          <span className="terminal-command-text"> {line.text}</span>
+        </div>
+      );
     case "output":
       return <div className={`line-out line-${line.stream}`}>{line.text}</div>;
     case "exit":
-      if (line.code === 0) {
-        return <div className="line-exit line-exit-ok">[exit 0]</div>;
-      }
-      return (
-        <div className="line-exit line-exit-fail">
-          [exit {line.code ?? line.signal ?? "?"}]
-        </div>
-      );
+      return null;
     case "error":
       return <div className="line-err">⚠ {line.text}</div>;
     case "info":

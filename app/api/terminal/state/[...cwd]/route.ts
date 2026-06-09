@@ -53,6 +53,7 @@ export async function GET(
 
   const session = getTerminalManager().getOrCreate(cwd);
   return NextResponse.json({
+    prompt: promptForCwd(cwd),
     buffer: session.buffer,
     history: session.history,
     running: session.runningProcess
@@ -64,4 +65,11 @@ export async function GET(
         }
       : null,
   });
+}
+
+function promptForCwd(cwd: string): string {
+  const username = os.userInfo().username || path.basename(os.homedir()) || "user";
+  const host = os.hostname().split(".")[0] || "localhost";
+  const dir = path.basename(cwd) || cwd;
+  return `${username}@${host} ${dir} %`;
 }
