@@ -634,13 +634,13 @@ export function AppShell() {
               display: "flex", alignItems: "center", justifyContent: "center",
               height: 38, padding: "0 10px", flexShrink: 0, marginLeft: "auto",
               background: "none", border: "none", borderLeft: "1px solid var(--border)",
-              color: terminalOpen ? "var(--text)" : "var(--text-muted)",
+              color: terminalOpen ? "var(--text)" : "#000",
               cursor: terminalCwd ? "pointer" : "not-allowed",
-              font: "inherit", fontSize: 13, fontWeight: 600,
+              font: "inherit", fontSize: 13, fontWeight: 700,
               opacity: terminalCwd ? 1 : 0.4, transition: "color 0.12s, opacity 0.12s",
             }}
-            onMouseEnter={(e) => { if (terminalCwd) e.currentTarget.style.color = "var(--text)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = terminalOpen ? "var(--text)" : "var(--text-muted)"; }}
+            onMouseEnter={(e) => { if (terminalCwd) e.currentTarget.style.color = "#000"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = terminalOpen ? "var(--text)" : "#000"; }}
           >
             {"\u003E_"}
           </button>
