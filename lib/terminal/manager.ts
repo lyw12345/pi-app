@@ -29,7 +29,6 @@ import { getTerminalSettings } from "./settings";
 import { spawn } from "child_process";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __piTerminals: Map<string, TerminalSession> | undefined;
 }
 
@@ -246,7 +245,6 @@ export function resetTerminalManagerForTests(): void {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __piTerminalCleanupInstalled: boolean | undefined;
 }
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { lineBytes, appendLine } from "./ring-buffer";
 import type { TerminalLine, TerminalSession } from "./types";
 
-function makeSession(maxBytes = 1024): TerminalSession {
+function makeSession(): TerminalSession {
   return {
     cwd: "/tmp",
     buffer: [],
@@ -52,8 +52,10 @@ describe("appendLine", () => {
     appendLine(s, output("cccccccccc"), 100);   // forces eviction
     expect(s.buffer.length).toBe(2);
     expect(s.buffer[0].kind).toBe("output");
-    expect((s.buffer[0] as any).text).toBe("bbbbbbbbbb");
-    expect((s.buffer[1] as any).text).toBe("cccccccccc");
+    const out0 = s.buffer[0] as Extract<TerminalLine, { kind: "output" }>;
+    const out1 = s.buffer[1] as Extract<TerminalLine, { kind: "output" }>;
+    expect(out0.text).toBe("bbbbbbbbbb");
+    expect(out1.text).toBe("cccccccccc");
   });
 
   it("emits a truncated info line after >=100KB cumulative drops", () => {
