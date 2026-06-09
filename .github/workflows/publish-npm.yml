@@ -20,7 +20,7 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: "npm"
           package-manager-cache: false
-      - run: npm ci
+      - run: npm ci --min-release-age=0
       - run: npm run prepublishOnly
       - run: npm run build
       - name: Verify tag matches package.json version

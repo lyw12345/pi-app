@@ -20,7 +20,7 @@ jobs:
           cache: "npm"
           package-manager-cache: false
 
-      - run: npm ci
+      - run: npm ci --min-release-age=0
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
