@@ -1270,7 +1270,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               </button>
             )}
 
-            {onSoundToggle !== undefined && (
+{onSoundToggle !== undefined && (
               <button
                 onClick={onSoundToggle}
                 title={soundEnabled ? t("chatInput.soundOff") : t("chatInput.soundOn")}

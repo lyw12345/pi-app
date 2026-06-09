@@ -5,6 +5,7 @@ import WebKit
 ///
 /// Shares the WKProcessPool with the main `PiWebView` so cookies and storage
 /// are shared. The fetcher is never visible to the user.
+@MainActor
 final class HiddenWebFetcher: NSObject, WKNavigationDelegate {
   private let webView: WKWebView
   private var continuation: CheckedContinuation<WebFetchResult, Error>?
@@ -124,27 +125,31 @@ final class HiddenWebFetcher: NSObject, WKNavigationDelegate {
 
   // MARK: - WKNavigationDelegate
 
-  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-    // For "load" mode, run extractor immediately.
-    // For "domcontentloaded", we already got here. For "networkidle", wait a bit.
-    let wait = options?.waitUntil ?? "networkidle"
-    if wait == "networkidle" {
-      // Poll for network idle
-      Task { @MainActor in
+  nonisolated func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+    Task { @MainActor in
+      // For "load" mode, run extractor immediately.
+      // For "domcontentloaded", we already got here. For "networkidle", wait a bit.
+      let wait = self.options?.waitUntil ?? "networkidle"
+      if wait == "networkidle" {
+        // Poll for network idle
         try? await Task.sleep(nanoseconds: 500_000_000)  // 500ms grace
         self.runExtractor()
+      } else {
+        self.runExtractor()
       }
-    } else {
-      runExtractor()
     }
   }
 
-  func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-    resume(error: error)
+  nonisolated func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+    Task { @MainActor in
+      self.resume(error: error)
+    }
   }
 
-  func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-    resume(error: error)
+  nonisolated func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+    Task { @MainActor in
+      self.resume(error: error)
+    }
   }
 
   private func runExtractor() {

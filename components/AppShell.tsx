@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SessionSidebar } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
@@ -10,6 +10,7 @@ import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { BranchNavigator } from "./BranchNavigator";
 import { WorkbenchHome } from "./WorkbenchHome";
+import { TerminalPanel } from "./TerminalPanel";
 import { WorkbenchSettings } from "./WorkbenchSettings";
 import { RemotePairingHandler } from "./RemotePairingHandler";
 import { RemoteAccessBanner } from "./RemoteAccessBanner";
@@ -51,6 +52,9 @@ export function AppShell() {
   const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalHeight, setTerminalHeight] = useState(0.4);
+  const terminalCwd = useMemo(() => selectedSession?.cwd ?? null, [selectedSession]);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
   const [workbenchView, setWorkbenchView] = useState<"home" | "settings" | "chat">("home");
@@ -680,6 +684,25 @@ export function AppShell() {
               </button>
             </div>
           )}
+          {/* Terminal toggle — inside top bar, to the left of usage report */}
+          <button
+            onClick={() => setTerminalOpen((v) => !v)}
+            disabled={!terminalCwd}
+            title={terminalCwd ? (terminalOpen ? "Close terminal" : "Open terminal") : "Open a session first"}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              height: 38, padding: "0 10px", flexShrink: 0, marginLeft: "auto",
+              background: "none", border: "none", borderLeft: "1px solid var(--border)",
+              color: terminalOpen ? "var(--text)" : "#000",
+              cursor: terminalCwd ? "pointer" : "not-allowed",
+              font: "inherit", fontSize: 13, fontWeight: 700,
+              opacity: terminalCwd ? 1 : 0.4, transition: "color 0.12s, opacity 0.12s",
+            }}
+            onMouseEnter={(e) => { if (terminalCwd) e.currentTarget.style.color = "#000"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = terminalOpen ? "var(--text)" : "#000"; }}
+          >
+            {"\u003E_"}
+          </button>
           {showChat && (
             <SessionReportButton
               sessionStats={sessionStats}
@@ -785,6 +808,18 @@ export function AppShell() {
             </div>
           ) : null}
         </div>
+
+        {/* Terminal drawer at the bottom of the center column */}
+        {terminalCwd && (
+          <TerminalPanel
+            key={terminalCwd}
+            cwd={terminalCwd}
+            open={terminalOpen}
+            height={terminalHeight}
+            onClose={() => setTerminalOpen(false)}
+            onHeightChange={setTerminalHeight}
+          />
+        )}
       </div>
 
       {/* Right panel: file viewer — always mounted, width animated via CSS */}
