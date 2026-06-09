@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
+import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vs } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
@@ -591,6 +593,7 @@ function BlockView({ block, toolResults, streamingDuration, toolCallDurations, i
 function TextBlock({ block, isStreaming, onOpenFile, cwd }: { block: TextContent; isStreaming?: boolean; onOpenFile?: (filePath: string, fileName: string) => void; cwd?: string }) {
   const fileRefs = useMemo(() => extractAssistantOutputFileRefs(block.text, cwd), [block.text, cwd]);
   const displayText = useMemo(() => assistantOutputDisplayText(block.text, cwd), [block.text, cwd]);
+  const normalizedDisplayText = useMemo(() => normalizeDisplayMath(displayText), [displayText]);
   return (
     <div className="markdown-body">
       {fileRefs.length > 0 && (
@@ -606,7 +609,8 @@ function TextBlock({ block, isStreaming, onOpenFile, cwd }: { block: TextContent
         </div>
       )}
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
         components={{
           code({ className, children, ...props }) {
             const lang = className?.replace("language-", "").toLowerCase() ?? "";
@@ -639,10 +643,39 @@ function TextBlock({ block, isStreaming, onOpenFile, cwd }: { block: TextContent
           },
         }}
       >
-        {displayText}
+        {normalizedDisplayText}
       </ReactMarkdown>
     </div>
   );
+}
+
+function normalizeDisplayMath(markdown: string): string {
+  const lineBreak = markdown.includes("\r\n") ? "\r\n" : "\n";
+  const lines = markdown.split(/\r?\n/);
+  let fence: { marker: string; size: number } | null = null;
+
+  return lines
+    .map((line) => {
+      const fenceMatch = line.match(/^ {0,3}(`{3,}|~{3,})/);
+      if (fenceMatch) {
+        const marker = fenceMatch[1][0];
+        const size = fenceMatch[1].length;
+        if (!fence) fence = { marker, size };
+        else if (marker === fence.marker && size >= fence.size) fence = null;
+        return line;
+      }
+
+      if (fence) return line;
+
+      const displayMathMatch = line.match(/^([ \t]{0,3})\$\$(.+)\$\$[ \t]*$/);
+      if (!displayMathMatch) return line;
+
+      const math = displayMathMatch[2].trim();
+      if (!math) return line;
+
+      return `${displayMathMatch[1]}$$${lineBreak}${math}${lineBreak}${displayMathMatch[1]}$$`;
+    })
+    .join(lineBreak);
 }
 
 function MermaidBlock({ code, isStreaming }: { code: string; isStreaming?: boolean }) {
