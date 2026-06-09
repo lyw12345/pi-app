@@ -8,7 +8,7 @@ describe("OpenTerminalButton", () => {
     const onClick = vi.fn();
     const { container } = render(<OpenTerminalButton hasCwd={true} onClick={onClick} />);
     const btn = container.querySelector("button") as HTMLButtonElement;
-    expect(btn).not.toBeDisabled();
+    expect(btn.disabled).toBe(false);
     fireEvent.click(btn);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
@@ -17,7 +17,7 @@ describe("OpenTerminalButton", () => {
     const onClick = vi.fn();
     const { container } = render(<OpenTerminalButton hasCwd={false} onClick={onClick} />);
     const btn = container.querySelector("button") as HTMLButtonElement;
-    expect(btn).toBeDisabled();
+    expect(btn.disabled).toBe(true);
     expect(btn.getAttribute("title")).toMatch(/session/i);
     fireEvent.click(btn);
     expect(onClick).not.toHaveBeenCalled();
