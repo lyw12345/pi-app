@@ -25,7 +25,7 @@
     "package.json"
   ],
   "scripts": {
-    "dev": "PI_CODING_AGENT_DIR=~/tmp/pi-dev-agent NEXT_DIST_DIR=.next-dev-30142 next dev -p 30142 --webpack",
+    "dev": "PI_CODING_AGENT_DIR=~/tmp/pi-dev-agent NEXT_DIST_DIR=.next-dev-30142 next dev -p 30142",
     "dev:prod": "echo 'WARNING: next dev on 30141 hot-reloads with source edits; use npm start for daily 30141.' >&2 && next dev -p 30141",
     "build": "next build --webpack",
     "start": "next start -p 30141",
