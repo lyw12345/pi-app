@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SessionSidebar } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
@@ -10,6 +10,7 @@ import { ModelsConfig } from "./ModelsConfig";
 import { SkillsConfig } from "./SkillsConfig";
 import { BranchNavigator } from "./BranchNavigator";
 import { WorkbenchHome } from "./WorkbenchHome";
+import { TerminalPanel } from "./TerminalPanel";
 import { WorkbenchSettings } from "./WorkbenchSettings";
 import { RemotePairingHandler } from "./RemotePairingHandler";
 import { RemoteAccessBanner } from "./RemoteAccessBanner";
@@ -51,6 +52,9 @@ export function AppShell() {
   const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalHeight, setTerminalHeight] = useState(0.4);
+  const terminalCwd = useMemo(() => selectedSession?.cwd ?? null, [selectedSession]);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
   const [workbenchView, setWorkbenchView] = useState<"home" | "settings" | "chat">("home");
@@ -694,6 +698,7 @@ export function AppShell() {
               onOpenModels={handleOpenModelsConfig}
               onOpenSettings={handleOpenSettingsView}
               onOpenFile={handleOpenFile}
+              onOpenTerminal={() => setTerminalOpen(true)}
             />
           ) : showPlaceholder ? (
             workbenchView === "settings" ? (
@@ -727,6 +732,18 @@ export function AppShell() {
           ) : null}
         </div>
       </div>
+
+      {/* Bottom: terminal drawer (when a session is active) */}
+      {terminalCwd && (
+        <TerminalPanel
+          key={terminalCwd}
+          cwd={terminalCwd}
+          open={terminalOpen}
+          height={terminalHeight}
+          onClose={() => setTerminalOpen(false)}
+          onHeightChange={setTerminalHeight}
+        />
+      )}
 
       {/* Right panel: file viewer — always mounted, width animated via CSS */}
       <div
