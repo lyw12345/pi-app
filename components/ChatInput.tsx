@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, KeyboardEvent } from "react";
+import React, { useRef, useState, useCallback, useEffect, useMemo, useImperativeHandle, forwardRef, KeyboardEvent } from "react";
+import {
+  filterSlashCommands,
+  getSlashCompletionAtCursor,
+  insertSlashCommandAtCursor,
+  type SlashCommandEntry,
+} from "@/lib/slash-commands";
 
 export interface AttachedImage {
   data: string;   // base64, no prefix
@@ -37,6 +43,8 @@ interface Props {
   retryInfo?: { attempt: number; maxAttempts: number; errorMessage?: string } | null;
   soundEnabled?: boolean;
   onSoundToggle?: () => void;
+  slashCommandsEnabled?: boolean;
+  slashCommands?: SlashCommandEntry[];
 }
 
 export interface ChatInputHandle {
@@ -66,8 +74,11 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   thinkingLevel, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   retryInfo,
   soundEnabled, onSoundToggle,
+  slashCommandsEnabled = false, slashCommands = [],
 }: Props, ref) {
   const [value, setValue] = useState("");
+  const [cursorPos, setCursorPos] = useState(0);
+  const [slashHighlight, setSlashHighlight] = useState(0);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [modelDropdownRect, setModelDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
@@ -186,6 +197,42 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   }, [value, attachedImages, onSteer, onFollowUp, clearImages]);
 
+  const slashCompletion = useMemo(
+    () => (slashCommandsEnabled ? getSlashCompletionAtCursor(value, cursorPos) : null),
+    [slashCommandsEnabled, value, cursorPos],
+  );
+  const filteredSlashCommands = useMemo(
+    () => (slashCompletion ? filterSlashCommands(slashCommands, slashCompletion.query) : []),
+    [slashCommands, slashCompletion],
+  );
+  const slashMenuOpen = Boolean(slashCompletion && filteredSlashCommands.length > 0);
+
+  useEffect(() => {
+    setSlashHighlight(0);
+  }, [slashCompletion?.query]);
+
+  const syncCursor = useCallback(() => {
+    const ta = textareaRef.current;
+    if (ta) setCursorPos(ta.selectionStart ?? ta.value.length);
+  }, []);
+
+  const applySlashCommand = useCallback((name: string) => {
+    const ta = textareaRef.current;
+    const pos = ta ? (ta.selectionStart ?? ta.value.length) : cursorPos;
+    const inserted = insertSlashCommandAtCursor(value, pos, name);
+    if (!inserted) return;
+    setValue(inserted.text);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(inserted.cursor, inserted.cursor);
+      setCursorPos(inserted.cursor);
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    });
+  }, [value, cursorPos]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       const nativeEvent = e.nativeEvent;
@@ -194,6 +241,29 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         isComposingRef.current ||
         nativeEvent.isComposing ||
         nativeEvent.keyCode === 229;
+
+      if (slashMenuOpen) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSlashHighlight((i) => (i + 1) % filteredSlashCommands.length);
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSlashHighlight((i) => (i - 1 + filteredSlashCommands.length) % filteredSlashCommands.length);
+          return;
+        }
+        if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey && !isComposing && !recentlyComposed) {
+          e.preventDefault();
+          const picked = filteredSlashCommands[slashHighlight];
+          if (picked) applySlashCommand(picked.name);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          return;
+        }
+      }
 
       if (e.key === "Enter" && !e.shiftKey && (isComposing || recentlyComposed)) {
         if (recentlyComposed) e.preventDefault();
@@ -210,7 +280,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         }
       }
     },
-    [isStreaming, onSteer, onFollowUp, sendQueued, handleSend]
+    [slashMenuOpen, filteredSlashCommands, slashHighlight, applySlashCommand, isStreaming, onSteer, onFollowUp, sendQueued, handleSend]
   );
 
   const handleInput = useCallback(() => {
@@ -345,6 +415,51 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           </div>
         )}
 
+        {slashMenuOpen && (
+          <div
+            style={{
+              marginBottom: 6,
+              maxHeight: 200,
+              overflow: "auto",
+              background: "var(--bg)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              boxShadow: "0 -4px 16px rgba(0,0,0,0.10)",
+            }}
+          >
+            {filteredSlashCommands.map((cmd, index) => (
+              <button
+                key={`${cmd.source}-${cmd.name}`}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  applySlashCommand(cmd.name);
+                }}
+                style={{
+                  display: "flex",
+                  width: "100%",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  background: index === slashHighlight ? "var(--bg-selected)" : "none",
+                  border: "none",
+                  color: "var(--text)",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  textAlign: "left",
+                }}
+              >
+                <span style={{ fontFamily: "var(--font-mono)" }}>/{cmd.name}</span>
+                {cmd.description && (
+                  <span style={{ color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {cmd.description}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Main input */}
         <div
           style={{
@@ -364,8 +479,14 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setCursorPos(e.target.selectionStart ?? e.target.value.length);
+            }}
             onKeyDown={handleKeyDown}
+            onKeyUp={syncCursor}
+            onClick={syncCursor}
+            onSelect={syncCursor}
             onCompositionStart={() => {
               isComposingRef.current = true;
             }}
