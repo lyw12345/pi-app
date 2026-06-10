@@ -21,7 +21,9 @@
     "build": "next build --webpack",
     "start": "next start -p 30141",
     "lint": "eslint .",
-    "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public"
+    "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.78.1",
@@ -42,13 +44,16 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
+    "jsdom": "^27.4.0",
     "postcss": "^8",
     "tailwindcss": "^4.2.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   }
 }

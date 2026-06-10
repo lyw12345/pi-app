@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SessionSidebar } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
+import { TerminalPanel } from "./TerminalPanel";
 import { FileViewer } from "./FileViewer";
 import { TabBar, type Tab } from "./TabBar";
 import { ModelsConfig } from "./ModelsConfig";
@@ -28,6 +29,8 @@ export function AppShell() {
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalHeight, setTerminalHeight] = useState(0.4);
   const topBarRef = useRef<HTMLDivElement>(null);
 
   // Branch navigator state — populated by ChatWindow via onBranchDataChange
@@ -225,6 +228,7 @@ export function AppShell() {
 
   // Show chat area if a session is selected, or if we have a cwd to start a new session in
   const effectiveNewSessionCwd = newSessionCwd ?? (selectedSession === null && activeCwd ? activeCwd : null);
+  const terminalCwd = selectedSession?.cwd ?? newSessionCwd ?? activeCwd ?? null;
   const showChat = selectedSession !== null || effectiveNewSessionCwd !== null;
   // While restoring initial session from URL, don't show the placeholder
   const showPlaceholder = initialSessionRestored && !showChat;
@@ -605,6 +609,26 @@ export function AppShell() {
             </div>
           )}
 
+          {/* Terminal toggle — pushed to the right edge of the top bar */}
+          <button
+            onClick={() => setTerminalOpen((v) => !v)}
+            disabled={!terminalCwd}
+            title={terminalCwd ? (terminalOpen ? "Close terminal" : "Open terminal") : "Open a session first"}
+            aria-label="Toggle terminal"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              height: "100%", padding: "0 12px", flexShrink: 0, marginLeft: "auto",
+              background: "none", border: "none", borderLeft: "1px solid var(--border)",
+              color: terminalOpen ? "var(--text)" : "var(--text-muted)",
+              cursor: terminalCwd ? "pointer" : "not-allowed",
+              font: "inherit", fontSize: 13, fontWeight: 700,
+              opacity: terminalCwd ? 1 : 0.4, transition: "color 0.12s, opacity 0.12s",
+            }}
+            onMouseEnter={(e) => { if (terminalCwd) e.currentTarget.style.color = "var(--text)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = terminalOpen ? "var(--text)" : "var(--text-muted)"; }}
+          >
+            {">_"}
+          </button>
         </div>
 
         {/* Chat content */}
@@ -645,6 +669,18 @@ export function AppShell() {
             )
           ) : null}
         </div>
+
+        {/* Terminal drawer — bottom of the center column */}
+        {terminalCwd && (
+          <TerminalPanel
+            key={terminalCwd}
+            cwd={terminalCwd}
+            open={terminalOpen}
+            height={terminalHeight}
+            onClose={() => setTerminalOpen(false)}
+            onHeightChange={setTerminalHeight}
+          />
+        )}
       </div>
 
       {/* Right panel: file viewer — always mounted, width animated via CSS */}
