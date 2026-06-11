@@ -82,7 +82,9 @@ function isStandaloneFileReferenceLine(line: string, cwd?: string): boolean {
     return normalizeCandidatePath(markdownLink[2] ?? "", cwd) !== null;
   }
 
-  return normalizeCandidatePath(trimmed, cwd) !== null;
+  // Keep ordinary path lines visible. Only explicit inline-code/link file refs
+  // are hidden after chip extraction; prose lists of paths are user content.
+  return false;
 }
 
 export function assistantOutputDisplayText(text: string, cwd?: string): string {

@@ -42,6 +42,17 @@ describe("assistant output file refs", () => {
     expect(assistantOutputDisplayText(text)).toBe(text);
   });
 
+  it("keeps ordinary path list lines visible", () => {
+    const text = [
+      "新生成的文件：",
+      "- /Users/mk/.pi/agent/prompts/mk-qa.md",
+      "文件2：/Users/mk/.pi/agent/prompts/mk-ship.md",
+      "/Users/mk/codespace/pi-agent/docs/product-team-agent-plan.md",
+    ].join("\n");
+
+    expect(assistantOutputDisplayText(text, "/Users/mk/codespace/pi-agent")).toBe(text);
+  });
+
   it("ignores remote URLs and non-file inline code", () => {
     expect(extractAssistantOutputFileRefs("See [site](https://example.com) and `npm run test`.", "/repo")).toEqual([]);
   });
