@@ -7,7 +7,6 @@ import { RemoteAccessSettings } from "./RemoteAccessSettings";
 import { UsageActivityChart } from "./UsageActivityChart";
 import { ExtensionsSettings } from "./ExtensionsSettings";
 import { ScenePackControls } from "./ScenePackControls";
-import { WebFetchSettings } from "./WebFetchSettings";
 import { PowerManagementSettings } from "./PowerManagementSettings";
 
 interface Props {
@@ -104,7 +103,6 @@ export function WorkbenchSettings({
         </section>
 
         <ExtensionsSettings />
-        <WebFetchSettings />
         <ScenePackControls />
 
         <PowerManagementSettings />

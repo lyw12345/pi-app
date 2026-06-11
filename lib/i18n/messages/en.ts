@@ -160,26 +160,6 @@ export const en = {
     restartHint: "After changing extensions, restart pi-web. See",
     docsLink: "pi extensions docs",
   },
-  webFetchSettings: {
-    title: "Web Fetch",
-    description:
-      "Tool that lets the LLM fetch URLs as structured JSON-LD or clean Markdown. Tier 0 (JSON-LD) and Tier 1 (Readability) are always available; Tier 2 (browser) requires agent-browser or Pi.app on macOS.",
-    installed: "Installed",
-    notInstalled: "Not installed",
-    install: "Install",
-    installing: "Installing…",
-    installHint: "Downloads agent-browser + Chrome (~200 MB, one-time)",
-    available: "Available",
-    notInPiApp: "Available in Pi.app on macOS",
-    webkitHint: "Faster than agent-browser; reuses Pi.app's WebView.",
-    t2Backend: "Tier 2 backend",
-    t2Auto: "Auto — prefer WebKit on macOS Pi.app, fall back to agent-browser",
-    t2Webkit: "WebKit — macOS Pi.app only (fastest)",
-    t2Agent: "agent-browser — cross-platform",
-    cacheTtl: "Cache TTL",
-    toolHint:
-      "The LLM calls the web_fetch tool automatically when given a URL. No need to invoke manually.",
-  },
   scenePack: {
     title: "Scene pack",
     description: "Export or import scene override JSON for another machine or teammate.",
