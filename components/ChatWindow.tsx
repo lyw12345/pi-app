@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AgentMessage, SessionInfo, SessionTreeNode } from "@/lib/types";
 import { MessageView } from "./MessageView";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
+import type { SlashCommandEntry } from "@/lib/slash-commands";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { useAgentSession, type AgentPhase } from "@/hooks/useAgentSession";
 import { useAudio } from "@/hooks/useAudio";
@@ -150,6 +151,36 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   }, [ctxKey, onContextUsageChange]);
   useEffect(() => () => { onContextUsageChange?.(null); }, [onContextUsageChange]);
 
+  // Slash command source: skills available in the current cwd. Uses the
+  // existing /api/skills route (DefaultResourceLoader) — no agent-runtime
+  // coupling. Extensions/prompt-templates are pi-app-only and omitted here.
+  const [slashCommands, setSlashCommands] = useState<SlashCommandEntry[]>([]);
+  useEffect(() => {
+    if (!currentCwd) {
+      setSlashCommands([]);
+      return;
+    }
+    let cancelled = false;
+    void fetch(`/api/skills?cwd=${encodeURIComponent(currentCwd)}`)
+      .then((res) => res.json())
+      .then((data: { skills?: Array<{ name: string; description?: string }> }) => {
+        if (cancelled) return;
+        setSlashCommands(
+          (data.skills ?? []).map((skill) => ({
+            name: `skill:${skill.name}`,
+            description: skill.description,
+            source: "skill" as const,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setSlashCommands([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentCwd, modelsRefreshKey]);
+
   const onDrop = useCallback((files: File[]) => {
     chatInputRef?.current?.addImages(files);
   }, [chatInputRef]);
@@ -194,6 +225,8 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       retryInfo={retryInfo}
       soundEnabled={soundEnabled}
       onSoundToggle={onSoundToggle}
+      slashCommandsEnabled={(Boolean(session) || isNew)}
+      slashCommands={slashCommands}
     />
   );
 
