@@ -16,6 +16,29 @@ interface MarkdownBodyProps {
   isStreaming?: boolean;
 }
 
+type MarkdownAstNode = {
+  value?: unknown;
+  children?: MarkdownAstNode[];
+};
+
+function reactNodeToText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(reactNodeToText).join("");
+  return "";
+}
+
+function markdownAstNodeToText(node: MarkdownAstNode | undefined): string {
+  if (!node) return "";
+  if (typeof node.value === "string" || typeof node.value === "number") return String(node.value);
+  return node.children?.map(markdownAstNodeToText).join("") ?? "";
+}
+
+function markdownCodeText(children: ReactNode, node: unknown): string {
+  const childText = reactNodeToText(children);
+  if (childText) return childText;
+  return markdownAstNodeToText(node as MarkdownAstNode | undefined);
+}
+
 function copyText(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
     return navigator.clipboard.writeText(text);
@@ -44,9 +67,9 @@ export function MarkdownBody({ children, className, isStreaming }: MarkdownBodyP
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
         components={{
-          code({ className, children, ...props }) {
+          code({ className, children, node, ...props }) {
             const lang = className?.replace("language-", "").toLowerCase() ?? "";
-            const raw = String(children);
+            const raw = markdownCodeText(children, node);
             const isBlock = className?.includes("language-") || raw.includes("\n");
             if (isBlock) {
               if (lang === "mermaid") {
