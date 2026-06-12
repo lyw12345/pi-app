@@ -107,21 +107,23 @@ NODE
 }
 
 build_production_next() {
-  if [[ "$SKIP_BUILD" == "1" && -f "$PACK_NEXT/BUILD_ID" ]]; then
-    echo "SKIP_BUILD=1 — reusing $PACK_NEXT"
+  if [[ "$SKIP_BUILD" == "1" && -d "$ROOT/.next/standalone" ]]; then
+    echo "SKIP_BUILD=1 — reusing $ROOT/.next/standalone"
     return 0
   fi
-  rm -rf "$PACK_NEXT"
-  echo "building production .next (isolated, no dev cache)..."
-  # NEXT_DIST_DIR must be relative to repo root; absolute paths are ignored by Next.
-  (cd "$ROOT" && NEXT_DIST_DIR=".next-package" npm run build)
-  rm -rf "$PACK_NEXT/cache" "$PACK_NEXT/dev" 2>/dev/null || true
-  find "$PACK_NEXT" -name "*.map" -delete 2>/dev/null || true
-  if [[ ! -f "$PACK_NEXT/BUILD_ID" ]]; then
-    echo "error: production build failed (no $PACK_NEXT/BUILD_ID)" >&2
+  rm -rf "$ROOT/.next"
+  echo "building production standalone .next (no dev cache)..."
+  # PI_STANDALONE=1 turns on Next standalone output: the build traces the minimal
+  # set of server runtime files into .next/standalone (a self-contained server.js
+  # + pruned node_modules, no @next/swc), shrinking the bundle dramatically.
+  # Build to the default .next so the baked distDir matches the bundle layout.
+  (cd "$ROOT" && PI_STANDALONE=1 NEXT_DIST_DIR=.next npm run build)
+  if [[ ! -d "$ROOT/.next/standalone" ]]; then
+    echo "error: standalone output missing ($ROOT/.next/standalone)" >&2
     exit 1
   fi
-  echo "production .next size: $(du -sh "$PACK_NEXT" | cut -f1)"
+  rm -rf "$ROOT/.next/cache" 2>/dev/null || true
+  echo "standalone size: $(du -sh "$ROOT/.next/standalone" | cut -f1)"
 }
 
 embed_node() {
@@ -183,10 +185,9 @@ install_production_deps() {
   echo "node_modules size: $(du -sh "$PI_WEB_RES/node_modules" | cut -f1)"
 }
 
-# Trim non-runtime weight from the bundled node_modules. Safe to skip with
-# SKIP_SLIM=1. The host's @next/swc native package is always kept (required to
-# compile the TypeScript next.config.ts at `next start`); only other-platform
-# swc packages and non-runtime files (types/docs/maps) are removed.
+# Trim non-runtime weight from the standalone node_modules. Safe to skip with
+# SKIP_SLIM=1. Standalone tracing already drops @next/swc and unused packages;
+# this only removes leftover non-runtime files (types/markdown/sourcemaps/docs).
 slim_bundle() {
   if [[ "${SKIP_SLIM:-0}" == "1" ]]; then
     echo "SKIP_SLIM=1 — keeping full bundle node_modules"
@@ -197,7 +198,7 @@ slim_bundle() {
   local before
   before="$(du -sh "$nm" | cut -f1)"
 
-  # 1) agent-browser ships one prebuilt binary per platform; keep only this host's.
+  # agent-browser (if traced) ships one prebuilt binary per platform; keep host's.
   local ab_bin="$nm/agent-browser/bin"
   if [[ -d "$ab_bin" ]]; then
     local keep=""
@@ -211,24 +212,9 @@ slim_bundle() {
     fi
   fi
 
-  # 2) Drop files never needed to run: TS types, markdown, sourcemaps, docs/examples.
+  # Drop files never needed to run: TS types, markdown, sourcemaps, docs/examples.
   find "$nm" -type f \( -name '*.d.ts' -o -name '*.d.ts.map' -o -name '*.md' -o -name '*.markdown' -o -name '*.map' \) -delete 2>/dev/null || true
   find "$nm" -type d \( -name docs -o -name examples -o -name example -o -name __tests__ -o -name '.github' \) -prune -exec rm -rf {} + 2>/dev/null || true
-
-  # 3) @next/swc native compiler: REQUIRED at `next start` because next.config.ts
-  #    is TypeScript (Next compiles it via SWC on boot; missing it falls back to a
-  #    wasm build whose output throws `__dirname is not defined`, so the server
-  #    won't start). Keep this host's swc; only drop other-platform swc packages
-  #    (npm normally installs just the host one, so this is usually a no-op).
-  local keep_swc=""
-  case "$(uname -m)" in
-    arm64) keep_swc="swc-darwin-arm64" ;;
-    x86_64) keep_swc="swc-darwin-x64" ;;
-  esac
-  if [[ -n "$keep_swc" && -d "$nm/@next" ]]; then
-    find "$nm/@next" -maxdepth 1 -type d -name 'swc-*' ! -name "$keep_swc" -exec rm -rf {} + 2>/dev/null || true
-    echo "kept @next/$keep_swc (needed to compile next.config.ts on start)"
-  fi
 
   echo "bundle node_modules slimmed: $before -> $(du -sh "$nm" | cut -f1)"
 }
@@ -241,30 +227,28 @@ mkdir -p "$MACOS" "$PI_WEB_RES" "$NODE_DIR/bin"
 cp "$SWIFT_BUILD" "$MACOS/$APP_NAME"
 chmod +x "$MACOS/$APP_NAME"
 
-echo "copying pi-web runtime files..."
-rsync -a \
-  "$ROOT/bin" \
-  "$ROOT/public" \
-  "$ROOT/package.json" \
-  "$ROOT/next.config.ts" \
-  "$PI_WEB_RES/"
-if ! uses_local_pi_deps; then
-  rsync -a "$ROOT/package-lock.json" "$PI_WEB_RES/"
-fi
-rsync -a \
-  --exclude cache \
-  --exclude dev \
-  --exclude '**/*.map' \
-  "$PACK_NEXT/" \
-  "$PI_WEB_RES/.next/"
+echo "assembling standalone runtime into bundle..."
+# 1) standalone root: self-contained server.js + traced node_modules + minimal
+#    .next server files + package.json (no @next/swc, no dev cache).
+rsync -a "$ROOT/.next/standalone/" "$PI_WEB_RES/"
+# 2) static assets + public are not copied by standalone; place them where the
+#    standalone server expects them (.next/static and ./public).
+mkdir -p "$PI_WEB_RES/.next/static"
+rsync -a --exclude '**/*.map' "$ROOT/.next/static/" "$PI_WEB_RES/.next/static/"
+rsync -a "$ROOT/public" "$PI_WEB_RES/"
+# 3) launcher (bin/pi-app.js detects server.js and runs it directly).
+rsync -a "$ROOT/bin" "$PI_WEB_RES/"
 
 embed_node
-install_production_deps
 slim_bundle
 chmod +x "$PI_WEB_RES/bin/pi-app.js" 2>/dev/null || true
 # Compat symlink for any older Swift build that still looks up the old name.
 ln -sf pi-app.js "$PI_WEB_RES/bin/pi-web.js"
 
+if [[ ! -f "$PI_WEB_RES/server.js" ]]; then
+  echo "error: standalone server.js not found in bundle" >&2
+  exit 1
+fi
 if [[ ! -d "$PI_WEB_RES/node_modules/next" ]]; then
   echo "error: next not found under bundle node_modules" >&2
   exit 1

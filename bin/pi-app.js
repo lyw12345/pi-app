@@ -80,15 +80,29 @@ if (!fs.existsSync(nextDir)) {
   process.exit(1);
 }
 
-const nextArgs = ["start", "-p", port];
-if (hostname) nextArgs.push("-H", hostname);
-
 const childEnv = { ...process.env };
 if (remoteFlag && !childEnv.PI_WEB_REMOTE) childEnv.PI_WEB_REMOTE = "1";
 
-// Always run next's JS entry with node directly — avoids .bin symlink issues
-// and path-with-spaces problems on Windows when shell: true is used.
-const child = spawn(process.execPath, [nextBin, ...nextArgs], {
+// Prefer the standalone server bundled in the desktop app (a self-contained
+// server.js with a pruned node_modules and no @next/swc). Fall back to
+// `next start` for plain npm installs that ship the full .next + node_modules.
+const standaloneServer = path.join(pkgDir, "server.js");
+let spawnArgs;
+if (fs.existsSync(standaloneServer)) {
+  // Next standalone server reads PORT/HOSTNAME from env. Default to 0.0.0.0 to
+  // match the previous `next start` behavior (LAN-reachable for share/pairing).
+  childEnv.PORT = String(port);
+  childEnv.HOSTNAME = hostname || "0.0.0.0";
+  spawnArgs = [standaloneServer];
+} else {
+  const nextArgs = ["start", "-p", port];
+  if (hostname) nextArgs.push("-H", hostname);
+  spawnArgs = [nextBin, ...nextArgs];
+}
+
+// Always run the JS entry with node directly — avoids .bin symlink issues and
+// path-with-spaces problems on Windows when shell: true is used.
+const child = spawn(process.execPath, spawnArgs, {
   cwd: pkgDir,
   stdio: ["inherit", "pipe", "inherit"],
   env: childEnv,

@@ -25,6 +25,10 @@ const piServerExternalPackages = [
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  // Standalone output (enabled only when packaging) traces the minimal set of
+  // server runtime files into .next/standalone, dramatically shrinking the
+  // bundled node_modules. Dev/normal builds are unaffected.
+  output: process.env.PI_STANDALONE === "1" ? "standalone" : undefined,
   serverExternalPackages: piServerExternalPackages,
   webpack: (config, { isServer }) => {
     if (!isServer) return config;
