@@ -635,6 +635,18 @@ function TextBlock({ block, isStreaming, onOpenFile, cwd }: { block: TextContent
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
         components={{
+          a({ href, children, ...props }) {
+            const url = href ?? "";
+            const isExternal = /^https?:\/\//i.test(url);
+            if (isExternal) {
+              return (
+                <a href={url} target="_blank" rel="noopener noreferrer" {...props}>
+                  {children}
+                </a>
+              );
+            }
+            return <a href={url} {...props}>{children}</a>;
+          },
           code({ className, children, node, ...props }) {
             const lang = className?.replace("language-", "").toLowerCase() ?? "";
             const raw = markdownCodeText(children, node);

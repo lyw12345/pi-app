@@ -243,7 +243,27 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
   const activeSessionId = session?.id ?? sessionIdRef.current ?? null;
 
   useEffect(() => {
-    if (!activeSessionId || !slashCommandsEnabled) {
+    if (!slashCommandsEnabled) {
+      setSlashCommands([]);
+      return;
+    }
+
+    // For new conversations, fetch skills directly from the skills API
+    if (isNew && newSessionCwd) {
+      void fetch(`/api/skills?cwd=${encodeURIComponent(newSessionCwd)}`)
+        .then((res) => res.json())
+        .then((data: { skills?: Array<{ name: string; description?: string }> }) => {
+          setSlashCommands((data.skills ?? []).map((skill) => ({
+            name: `skill:${skill.name}`,
+            description: skill.description,
+            source: "skill" as const,
+          })));
+        })
+        .catch(() => setSlashCommands([]));
+      return;
+    }
+
+    if (!activeSessionId) {
       setSlashCommands([]);
       return;
     }
@@ -257,7 +277,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
         setSlashCommands(data.data?.commands ?? []);
       })
       .catch(() => setSlashCommands([]));
-  }, [activeSessionId, slashCommandsEnabled, modelsRefreshKey]);
+  }, [activeSessionId, slashCommandsEnabled, modelsRefreshKey, isNew, newSessionCwd]);
 
   const steerMode =
     agentRunning &&
@@ -297,7 +317,7 @@ export function ChatWindow({ session, newSessionCwd, onAgentEnd, onSessionCreate
       onClone={session && !isNew ? handleClone : undefined}
       cloning={cloning}
       sessionId={activeSessionId}
-      slashCommandsEnabled={slashCommandsEnabled && !isNew}
+      slashCommandsEnabled={slashCommandsEnabled}
       slashCommands={slashCommands}
       onOpenSettings={onOpenSettings}
       onOpenFile={onOpenFile}

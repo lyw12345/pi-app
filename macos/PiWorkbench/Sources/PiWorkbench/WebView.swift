@@ -36,6 +36,30 @@ final class PiWebView: WKWebView, WKNavigationDelegate {
   func load(_ url: URL) {
     load(URLRequest(url: url))
   }
+
+  // MARK: - WKNavigationDelegate
+
+  nonisolated func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+    // Allow the initial page load and same-origin navigations.
+    guard let requestURL = navigationAction.request.url,
+          navigationAction.navigationType == .linkActivated
+    else {
+      decisionHandler(.allow)
+      return
+    }
+
+    // Only intercept external URLs (not our own server).
+    guard let serverURL = webView.url, requestURL.host != serverURL.host || requestURL.port != serverURL.port else {
+      decisionHandler(.allow)
+      return
+    }
+
+    // Open external links in the system default browser.
+    Task { @MainActor in
+      NSWorkspace.shared.open(requestURL)
+    }
+    decisionHandler(.cancel)
+  }
 }
 
 struct WebViewRepresentable: NSViewRepresentable {
