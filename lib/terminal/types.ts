@@ -1,8 +1,6 @@
 // lib/terminal/types.ts
 //
-// Shared types for the per-cwd terminal sessions. See:
-// docs/superpowers/specs/2026-06-09-pi-web-terminal-panel-design.md §5
-//
+// Shared types for the per-cwd terminal sessions.
 // All state is held in-memory in `globalThis.__piTerminals` (HMR-safe),
 // mirrored after the existing `globalThis.__piSessions` pattern.
 

@@ -2,8 +2,6 @@
 
 薄 macOS 应用：内嵌子进程运行 `bin/pi-web.js`，`WKWebView` 加载 `http://127.0.0.1:30141`，注入 `window.piNative`。
 
-契约：[../docs/macos-shell-contract.md](../docs/macos-shell-contract.md)
-
 ## 开发运行（本机已安装 Node）
 
 ```bash

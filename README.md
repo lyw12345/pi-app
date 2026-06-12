@@ -2,6 +2,26 @@
 
 [pi 编程智能体](https://github.com/badlogic/pi-mono) 的网页界面。在浏览器中浏览会话、与智能体对话、分叉对话、切换消息分支。
 
+## 日常维护
+
+```
+cd ~/codespace/pi-app
+
+# 拉社区更新
+git fetch upstream
+git log --oneline HEAD..upstream/main
+git merge upstream/main
+git push origin main
+
+# 日常开发
+git checkout -b feat/my-feature
+# ... 改 ...
+git commit -m "..."
+git push origin feat/my-feature
+
+```
+
+
 ## 快速开始
 
 **无需安装，直接运行：**
@@ -68,9 +88,6 @@ PORT=8080 pi-app                 # 也支持环境变量
 - **模型配置** — 从智能体数据目录下的 `models.json` 读取可用模型，可在侧边栏的「Models」面板中编辑。
 - **文件浏览** — 侧边栏内置文件浏览器，可在标签页中查看当前工作目录下的文件。
 
-## 规划
-
-总计划：[docs/plan-pi-web-macos-workbench.md](docs/plan-pi-web-macos-workbench.md)
 贯穿原则：[docs/product-principles.md](docs/product-principles.md)
 
 ## 开发

@@ -100,7 +100,7 @@ Browser                Next.js Server              AgentSession (in-process)
 **Session browsing** (read-only): reads `.jsonl` files directly via `lib/session-reader.ts` — no AgentSession created.  
 **Sending a message**: `startRpcSession()` in `lib/rpc-manager.ts` creates an AgentSession in-process.
 
-**macOS App (M1)**: Shell probes `GET /api/health` (loopback only). Web ↔ shell IPC via `window.piNative` — see `docs/macos-shell-contract.md`, `lib/pi-native.d.ts`, `lib/notify-agent-end.ts`. Dev shell: `macos/PiWorkbench` (SwiftPM). `.app` bundle + embedded Node is still M1-A packaging work under `macos/README.md`.
+**macOS App (M1)**: Shell probes `GET /api/health` (loopback only). Web ↔ shell IPC via `window.piNative` — see `lib/pi-native.d.ts`, `lib/notify-agent-end.ts`. Dev shell: `macos/PiWorkbench` (SwiftPM). `.app` bundle + embedded Node is still M1-A packaging work under `macos/README.md`.
 
 ---
 
