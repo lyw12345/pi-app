@@ -811,6 +811,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setAgentPhase(null);
       setRetryInfo(null);
       dispatch({ type: "end" });
+      initialScrollDoneRef.current = false;
     }
 
     const showLoading = isSessionSwitch || (previousSessionId === null && !isInFlightCreate);
