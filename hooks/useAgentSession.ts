@@ -169,6 +169,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     includeState = false,
     options?: { preserveMessages?: boolean },
   ) => {
+    // During the in-flight create period the server may not have persisted the
+    // optimistic user message yet, so any loadSession that races ahead of
+    // the persistence can clear the user bubble. Honor the in-flight flag
+    // regardless of which caller invoked us.
+    const inFlightCreate = pendingCreateSessionIdRef.current === sid;
+    const preserveMessages = options?.preserveMessages || inFlightCreate;
     try {
       if (showLoading) setLoading(true);
       const url = includeState
@@ -188,7 +194,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       const d = await res.json() as SessionData & { agentState?: { running: boolean; state?: { isStreaming?: boolean; isCompacting?: boolean; contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null; systemPrompt?: string; thinkingLevel?: string } } };
       setData(d);
       setActiveLeafId(d.leafId);
-      if (!options?.preserveMessages) {
+      if (!preserveMessages) {
         setMessages(d.context.messages);
         setEntryIds(d.context.entryIds ?? []);
       }
@@ -383,6 +389,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setAgentPhase(null);
         setRetryInfo(null);
         dispatch({ type: "end" });
+        // First agent_end marks the end of the in-flight create period —
+        // the server has now processed and persisted the user prompt, so
+        // it's safe for future loadSession calls to use the server view.
+        if (pendingCreateSessionIdRef.current && pendingCreateSessionIdRef.current === sessionIdRef.current) {
+          pendingCreateSessionIdRef.current = null;
+        }
         if (sessionIdRef.current) {
           loadSession(sessionIdRef.current);
           fetch(`/api/agent/${encodeURIComponent(sessionIdRef.current)}`)
@@ -783,8 +795,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
 
     const previousSessionId = previousSessionIdRef.current;
     const isSessionSwitch = previousSessionId !== null && previousSessionId !== session.id;
+    // Don't clear pendingCreateSessionIdRef here — leave it set so subsequent
+    // loadSession calls (from agent_end, waitForAgentIdle, etc.) also preserve
+    // the optimistic user message. The flag is cleared on the first agent_end
+    // event, which means the server has processed and persisted the prompt.
     const isInFlightCreate = pendingCreateSessionIdRef.current === session.id;
-    if (isInFlightCreate) pendingCreateSessionIdRef.current = null;
     previousSessionIdRef.current = session.id;
     sessionIdRef.current = session.id;
     let cancelled = false;

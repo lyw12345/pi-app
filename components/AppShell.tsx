@@ -291,12 +291,30 @@ export function AppShell() {
   }, [ensureWorkbenchCwd, i18nT, resetChatChrome, router]);
 
   // Called by ChatWindow when a new session gets its real id from pi
+  const sessionRefreshTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const handleSessionCreated = useCallback((session: SessionInfo) => {
     setNewSessionCwd(null);
     setSelectedSession(session);
     setRefreshKey((k) => k + 1);
     router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
+    // Re-trigger the sidebar refresh after the session file is fully
+    // persisted. The first refresh may race the prompt write, leaving the
+    // sidebar with messageCount=0 and a "(no messages)" placeholder title.
+    // A second fetch a moment later picks up the persisted entry so the
+    // tab shows the user's prompt as its name.
+    const t = setTimeout(() => {
+      sessionRefreshTimersRef.current.delete(t);
+      setRefreshKey((k) => k + 1);
+    }, 600);
+    sessionRefreshTimersRef.current.add(t);
   }, [router]);
+  useEffect(() => {
+    const timers = sessionRefreshTimersRef.current;
+    return () => {
+      for (const t of timers) clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
 
   const handleAgentEnd = useCallback(() => {
     setRefreshKey((k) => k + 1);
