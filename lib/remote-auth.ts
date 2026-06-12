@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { resolveLanOrigin } from "./lan-origin";
 import { buildConnectionOffer, buildOfferUrl } from "./pi-relay/connection-offer";
 import { generateRelayKeyPair } from "./pi-relay/crypto";
 import { DEFAULT_RELAY_ENDPOINT } from "./pi-relay/types";
@@ -534,7 +535,7 @@ export function createPairingOffer(req: Request): RemotePairingOffer {
   ];
   saveRemoteAuthConfig({ ...config, pairingCodes });
   appendRemoteAuditEvent({ type: "pairing_created" });
-  const origin = new URL(req.url).origin;
+  const origin = resolveLanOrigin(req.url);
   return {
     code,
     expiresAt,
