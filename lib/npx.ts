@@ -23,6 +23,10 @@ function findNpxCli(): string | null {
     join(nodeDir, "node_modules", "npm", "bin", "npx-cli.js"),
     // Unix layout: .../bin/node + .../lib/node_modules/npm/bin/npx-cli.js
     join(nodeDir, "..", "lib", "node_modules", "npm", "bin", "npx-cli.js"),
+    // Homebrew (Apple Silicon / Intel) — covers the Pi.app case where the
+    // bundled Node is binary-only and has no npm/npx next to it.
+    "/opt/homebrew/lib/node_modules/npm/bin/npx-cli.js",
+    "/usr/local/lib/node_modules/npm/bin/npx-cli.js",
   ];
   for (const p of candidates) {
     try {
