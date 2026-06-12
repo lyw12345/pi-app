@@ -92,7 +92,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   thinkingLevel, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap,
   retryInfo,
   soundEnabled, onSoundToggle,
-  onClone, cloning = false,
   sessionId = null,
   slashCommandsEnabled = false,
   slashCommands = [],
@@ -1156,39 +1155,6 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                 }}
               >
                 {exportingHtml ? t("settings.exporting") : t("chatInput.exportHtml")}
-              </button>
-            )}
-
-            {!isStreaming && onClone && (
-              <button
-                type="button"
-                onClick={onClone}
-                disabled={cloning}
-                title={t("appShell.cloneSessionTitle")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  padding: "8px 12px",
-                  height: 32,
-                  background: "none",
-                  border: "none",
-                  borderRadius: 9,
-                  color: cloning ? "var(--accent)" : "var(--text-muted)",
-                  cursor: cloning ? "not-allowed" : "pointer",
-                  fontSize: 12,
-                  whiteSpace: "nowrap",
-                  transition: "background 0.12s, color 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  if (cloning) return;
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "none";
-                  e.currentTarget.style.color = cloning ? "var(--accent)" : "var(--text-muted)";
-                }}
-              >
-                {cloning ? t("appShell.cloningSession") : t("appShell.cloneSession")}
               </button>
             )}
 
