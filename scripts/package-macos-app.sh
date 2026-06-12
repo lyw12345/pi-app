@@ -293,12 +293,20 @@ cat > "$CONTENTS/Info.plist" <<EOF
 </plist>
 EOF
 
-# Clear quarantine; sign only executables (avoid deep-signing huge node_modules).
+# Clear quarantine, then ad-hoc DEEP-sign the whole bundle. Signing only the top
+# executables leaves nested native binaries (embedded node, *.node addons, sharp
+# libvips *.dylib) unsigned; a quarantined download is then flagged "damaged" on
+# Apple Silicon. Deep ad-hoc signing gives every nested binary a valid signature
+# (still unnotarized: a downloaded copy needs one right-click > Open, or
+# `xattr -dr com.apple.quarantine /Applications/Pi.app`).
 xattr -cr "$APP" 2>/dev/null || true
 if command -v codesign >/dev/null 2>&1; then
-  codesign --force -s - "$MACOS/$APP_NAME" 2>/dev/null || true
-  if [[ -x "$NODE_DIR/bin/node" ]]; then
-    codesign --force -s - "$NODE_DIR/bin/node" 2>/dev/null || true
+  echo "ad-hoc deep-signing bundle (covers nested native binaries)..."
+  if ! codesign --force --deep --timestamp=none -s - "$APP"; then
+    echo "warning: codesign failed; downloaded app may be flagged as damaged" >&2
+  fi
+  if ! codesign --verify --deep --strict "$APP" 2>/dev/null; then
+    echo "warning: codesign --verify did not pass" >&2
   fi
 fi
 
