@@ -184,7 +184,9 @@ install_production_deps() {
 }
 
 # Trim non-runtime weight from the bundled node_modules. Safe to skip with
-# SKIP_SLIM=1; keep the Next SWC native package with KEEP_NEXT_SWC=1.
+# SKIP_SLIM=1. The host's @next/swc native package is always kept (required to
+# compile the TypeScript next.config.ts at `next start`); only other-platform
+# swc packages and non-runtime files (types/docs/maps) are removed.
 slim_bundle() {
   if [[ "${SKIP_SLIM:-0}" == "1" ]]; then
     echo "SKIP_SLIM=1 — keeping full bundle node_modules"
@@ -213,11 +215,19 @@ slim_bundle() {
   find "$nm" -type f \( -name '*.d.ts' -o -name '*.d.ts.map' -o -name '*.md' -o -name '*.markdown' -o -name '*.map' \) -delete 2>/dev/null || true
   find "$nm" -type d \( -name docs -o -name examples -o -name example -o -name __tests__ -o -name '.github' \) -prune -exec rm -rf {} + 2>/dev/null || true
 
-  # 3) @next/swc is a build-time native compiler; serving a prebuilt .next via
-  #    `next start` does not need it. Override with KEEP_NEXT_SWC=1 if start fails.
-  if [[ "${KEEP_NEXT_SWC:-0}" != "1" ]]; then
-    rm -rf "$nm/@next/swc-"* 2>/dev/null || true
-    echo "pruned @next/swc native package"
+  # 3) @next/swc native compiler: REQUIRED at `next start` because next.config.ts
+  #    is TypeScript (Next compiles it via SWC on boot; missing it falls back to a
+  #    wasm build whose output throws `__dirname is not defined`, so the server
+  #    won't start). Keep this host's swc; only drop other-platform swc packages
+  #    (npm normally installs just the host one, so this is usually a no-op).
+  local keep_swc=""
+  case "$(uname -m)" in
+    arm64) keep_swc="swc-darwin-arm64" ;;
+    x86_64) keep_swc="swc-darwin-x64" ;;
+  esac
+  if [[ -n "$keep_swc" && -d "$nm/@next" ]]; then
+    find "$nm/@next" -maxdepth 1 -type d -name 'swc-*' ! -name "$keep_swc" -exec rm -rf {} + 2>/dev/null || true
+    echo "kept @next/$keep_swc (needed to compile next.config.ts on start)"
   fi
 
   echo "bundle node_modules slimmed: $before -> $(du -sh "$nm" | cut -f1)"
