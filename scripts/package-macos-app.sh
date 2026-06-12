@@ -183,6 +183,46 @@ install_production_deps() {
   echo "node_modules size: $(du -sh "$PI_WEB_RES/node_modules" | cut -f1)"
 }
 
+# Trim non-runtime weight from the bundled node_modules. Safe to skip with
+# SKIP_SLIM=1; keep the Next SWC native package with KEEP_NEXT_SWC=1.
+slim_bundle() {
+  if [[ "${SKIP_SLIM:-0}" == "1" ]]; then
+    echo "SKIP_SLIM=1 — keeping full bundle node_modules"
+    return 0
+  fi
+  local nm="$PI_WEB_RES/node_modules"
+  [[ -d "$nm" ]] || return 0
+  local before
+  before="$(du -sh "$nm" | cut -f1)"
+
+  # 1) agent-browser ships one prebuilt binary per platform; keep only this host's.
+  local ab_bin="$nm/agent-browser/bin"
+  if [[ -d "$ab_bin" ]]; then
+    local keep=""
+    case "$(uname -m)" in
+      arm64) keep="agent-browser-darwin-arm64" ;;
+      x86_64) keep="agent-browser-darwin-x64" ;;
+    esac
+    if [[ -n "$keep" ]]; then
+      find "$ab_bin" -maxdepth 1 -type f -name 'agent-browser-*' ! -name "$keep" -delete 2>/dev/null || true
+      echo "pruned agent-browser foreign binaries (kept $keep)"
+    fi
+  fi
+
+  # 2) Drop files never needed to run: TS types, markdown, sourcemaps, docs/examples.
+  find "$nm" -type f \( -name '*.d.ts' -o -name '*.d.ts.map' -o -name '*.md' -o -name '*.markdown' -o -name '*.map' \) -delete 2>/dev/null || true
+  find "$nm" -type d \( -name docs -o -name examples -o -name example -o -name __tests__ -o -name '.github' \) -prune -exec rm -rf {} + 2>/dev/null || true
+
+  # 3) @next/swc is a build-time native compiler; serving a prebuilt .next via
+  #    `next start` does not need it. Override with KEEP_NEXT_SWC=1 if start fails.
+  if [[ "${KEEP_NEXT_SWC:-0}" != "1" ]]; then
+    rm -rf "$nm/@next/swc-"* 2>/dev/null || true
+    echo "pruned @next/swc native package"
+  fi
+
+  echo "bundle node_modules slimmed: $before -> $(du -sh "$nm" | cut -f1)"
+}
+
 build_production_next
 
 rm -rf "$APP"
@@ -210,6 +250,7 @@ rsync -a \
 
 embed_node
 install_production_deps
+slim_bundle
 chmod +x "$PI_WEB_RES/bin/pi-app.js" 2>/dev/null || true
 # Compat symlink for any older Swift build that still looks up the old name.
 ln -sf pi-app.js "$PI_WEB_RES/bin/pi-web.js"
