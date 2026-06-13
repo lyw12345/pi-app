@@ -21,6 +21,18 @@
 - **Swift CI**: `.github/workflows/swift-build.yml` builds and tests the macOS Swift code (`HiddenWebFetcher`, `PiNativeBridge`) on `macos-14`, in addition to the Node/Next build.
 - **Issue templates**: `bug_report.md`, `feature_request.md`, `web_fetch_feedback.md` for triaging T0/T1/T2 issues.
 
+## [0.8.4] - 2026-06-13
+
+### Fixed
+- **Preview (Pi.app)**: image copy/save uses the native bridge instead of browser-only APIs.
+- **Chat**: reset `initialScrollDone` on session switch so scroll-to-user fires again.
+- **Chat**: preserve the first user bubble and sync the sidebar after creating a new session.
+- **Skills**: resolve `npx-cli.js` under Homebrew so Pi.app can install skills.
+- **Chat**: wire skills into the new-session slash palette; open external links in the system browser.
+
+### Changed
+- **Docs**: clean up the docs directory.
+
 ## [Unreleased]
 
 ### Added
