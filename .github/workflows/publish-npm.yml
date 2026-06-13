@@ -22,6 +22,7 @@ jobs:
           package-manager-cache: false
       - run: npm ci --min-release-age=0
       - run: npm run prepublishOnly
+      - run: npm run release:version
       - run: npm run build
       - name: Verify tag matches package.json version
         run: |

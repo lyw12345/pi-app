@@ -21,6 +21,14 @@
 - **Swift CI**: `.github/workflows/swift-build.yml` builds and tests the macOS Swift code (`HiddenWebFetcher`, `PiNativeBridge`) on `macos-14`, in addition to the Node/Next build.
 - **Issue templates**: `bug_report.md`, `feature_request.md`, `web_fetch_feedback.md` for triaging T0/T1/T2 issues.
 
+## [0.8.5] - 2026-06-13
+
+**Bundle:** `0.8.5p0.79.3` (pi-app + `@earendil-works/pi-coding-agent`)
+
+### Changed
+- **pi engine**: bump `@earendil-works/pi-coding-agent` and `pi-ai` from 0.79.0 → **0.79.3** (Codex context limits, adaptive thinking, overflow error detection — see [earendil-works/pi releases](https://github.com/earendil-works/pi/releases)).
+- **Release workflow**: scripts and `AGENTS.md` checklist — every release syncs pi upstream, pins npm pi deps, and publishes GitHub Release with dual-version notes + DMG.
+
 ## [0.8.4] - 2026-06-13
 
 ### Fixed

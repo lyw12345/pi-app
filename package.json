@@ -1,6 +1,6 @@
 {
   "name": "pi-app",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "Web UI for the pi coding agent",
   "license": "MIT",
   "homepage": "https://github.com/asiachrispy/pi-app",
@@ -42,6 +42,12 @@
     "postinstall": "node scripts/install-cli.mjs",
     "postuninstall": "node scripts/uninstall-cli.mjs",
     "package:macos": "bash scripts/package-macos-app.sh",
+    "release:sync-pi": "bash scripts/sync-pi-upstream.sh",
+    "release:sync-pi-deps": "bash scripts/sync-pi-deps.sh",
+    "release:prepare": "bash scripts/release-pi-app.sh",
+    "release:github": "bash scripts/github-release.sh",
+    "release:version": "node scripts/release-version.mjs",
+    "release:check": "node scripts/release-version.mjs --check",
     "tunnel:cloudflare": "bash scripts/tunnel-cloudflared.sh",
     "relay:server": "node --experimental-strip-types scripts/pi-relay-server.ts",
     "relay:host": "node --experimental-strip-types scripts/pi-relay-host.ts",
@@ -50,8 +56,8 @@
     "prepublishOnly": "node_modules/.bin/tsc --noEmit && node_modules/.bin/vitest run"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "0.79.0",
-    "@earendil-works/pi-coding-agent": "0.79.0",
+    "@earendil-works/pi-ai": "0.79.3",
+    "@earendil-works/pi-coding-agent": "0.79.3",
     "@lobehub/icons": "5.10.0",
     "@types/react-syntax-highlighter": "15.5.13",
     "katex": "0.17.0",

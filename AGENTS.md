@@ -80,6 +80,52 @@ All test files that mock localhost must use port **30142**, not 30141. Search fo
 
 ---
 
+## Release (pi-app + pi)
+
+Every pi-app release **must** ship a known `@earendil-works/pi-coding-agent` version alongside the app. Versions are visible in three places:
+
+| Where | Format | Example |
+|-------|--------|---------|
+| Sidebar title (click) | `{app}p{pi}` | `0.8.4p0.79.3` |
+| `GET /api/health` | `version` + `piVersion` | `0.8.4` / `0.79.3` |
+| GitHub Release notes | table + bundle id | see `npm run release:github` |
+
+**Upstream pi** = [earendil-works/pi](https://github.com/earendil-works/pi) (npm `@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`). Local fork: sibling `../pi` (`PI_MONO`), remote `upstream` → earendil-works/pi.
+
+### Checklist (every release)
+
+1. **Sync pi upstream** (local fork, for dev parity):
+   ```bash
+   npm run release:sync-pi
+   ```
+2. **Pin pi-app to latest npm pi** (exact versions, lockfile via npm 10 for CI):
+   ```bash
+   npm run release:sync-pi-deps
+   node_modules/.bin/tsc --noEmit && npm run lint && npm run test:run
+   ```
+3. **Prepare app bump** (interactive) or manual `npm version patch`:
+   ```bash
+   npm run release:prepare
+   ```
+4. **CHANGELOG** — section must name **both** pi-app and pi versions.
+5. **Commit + tag** (tag `v*` triggers `.github/workflows/publish-npm.yml`):
+   ```bash
+   git commit -m "chore(release): vX.Y.Z (+ pi A.B.C)"
+   git tag vX.Y.Z
+   git push origin main && git push origin vX.Y.Z
+   ```
+6. **GitHub Release + Pi.app DMG** (after npm CI succeeds):
+   ```bash
+   npm run release:github
+   ```
+7. **Verify**: `npm view pi-app version`; `curl -s http://127.0.0.1:30141/api/health`
+
+Quick checks: `npm run release:version` · `npm run release:check` (fails if pi pin ≠ installed or behind npm latest).
+
+**Lockfile:** CI uses npm 10.9.8 — after dependency changes, regenerate with `npx -y npm@10.9.8 install --min-release-age=0` ( `sync-pi-deps.sh` does this).
+
+---
+
 ## Architecture
 
 ```
