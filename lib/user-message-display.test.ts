@@ -6,6 +6,13 @@ describe("displayUserMessageText", () => {
     expect(displayUserMessageText("/skill:foo-bar")).toBe("/skill:foo-bar");
   });
 
+  it("collapses legacy expanded /team prompt to slash label", () => {
+    const expanded = `你是 pi-agent 的 \`/team\` 入口。用户只需一条命令。
+
+## 需求：D-2026-002 verify`;
+    expect(displayUserMessageText(expanded)).toBe("/team D-2026-002 verify");
+  });
+
   it("collapses skill blocks to slash label", () => {
     const block = `<skill name="ai-image" location="/tmp/SKILL.md">
 body here
