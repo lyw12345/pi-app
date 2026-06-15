@@ -234,10 +234,12 @@ export const zhCN = {
     viewAllHistory: "查看全部",
     showLessHistory: "收起",
     startChatError: "无法开始对话：{error}",
+    projectName: "项目名称",
   },
   workbenchHistory: {
     workbench: "工作台",
     myWork: "我的工作",
+    projectName: "项目名称",
     loadingHistory: "历史加载中...",
     noWorkFound: "未找到工作记录。",
     showDetails: "查看详情",

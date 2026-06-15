@@ -234,10 +234,12 @@ export const en = {
     viewAllHistory: "View all",
     showLessHistory: "Show less",
     startChatError: "Couldn't start a conversation: {error}",
+    projectName: "Project",
   },
   workbenchHistory: {
     workbench: "Workbench",
     myWork: "My Work",
+    projectName: "Project",
     loadingHistory: "Loading history...",
     noWorkFound: "No work found.",
     showDetails: "Show details",

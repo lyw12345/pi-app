@@ -118,17 +118,24 @@ export function WorkbenchHome({
               showAllHistory ? (
                 <div
                   key={item.sessionId}
-                  className="group grid w-full grid-cols-[minmax(0,1fr)_150px_96px_auto] items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg-hover max-[720px]:grid-cols-[minmax(0,1fr)_auto]"
+                  className="group grid w-full grid-cols-[minmax(0,1fr)_150px_120px_auto] items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg-hover max-[720px]:grid-cols-[minmax(0,1fr)_auto]"
                 >
                   <button
                     type="button"
                     onClick={() => handleOpenHistory(item)}
                     className="min-w-0 text-left"
+                    title={item.cwd}
                   >
                     <div className="truncate text-[13px] font-semibold text-text">{item.title}</div>
                     <div className="mt-1 truncate text-[12px] text-text-muted">{item.summary}</div>
                   </button>
-                  <div className="truncate text-[12px] text-text-muted max-[720px]:hidden">{item.cwd}</div>
+                  <div
+                    className="truncate text-[12px] text-text-muted max-[720px]:hidden"
+                    title={item.cwd}
+                    aria-label={t("workbenchHistory.projectName")}
+                  >
+                    {item.projectName}
+                  </div>
                   <div className="text-[11px] text-text-dim max-[720px]:hidden">{new Date(item.updatedAt).toLocaleString(locale)}</div>
                   <button
                     type="button"
@@ -149,10 +156,18 @@ export function WorkbenchHome({
                   type="button"
                   onClick={() => handleOpenHistory(item)}
                   className="flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-bg-hover"
+                  title={item.cwd}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[13px] font-medium text-text">{item.title}</div>
                     <div className="mt-1 truncate text-[12px] text-text-muted">{item.summary}</div>
+                  </div>
+                  <div
+                    className="shrink-0 truncate text-[12px] text-text-muted"
+                    style={{ maxWidth: "160px" }}
+                    aria-label={t("workbenchHome.projectName")}
+                  >
+                    {item.projectName}
                   </div>
                   <div className="shrink-0 text-[11px] text-text-dim">{new Date(item.updatedAt).toLocaleDateString(locale)}</div>
                 </button>

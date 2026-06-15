@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHistoryItems } from "./product-history";
+import { buildHistoryItems, deriveProjectName, PROJECT_NAME_FALLBACK } from "./product-history";
 import type { SessionInfo } from "./types";
 import type { ProductSessionMetadataMap } from "./scene-metadata";
 
@@ -68,5 +68,44 @@ describe("buildHistoryItems", () => {
 
     const items = buildHistoryItems(sessions, {});
     expect(items.map((i) => i.sessionId)).toEqual(["new", "old"]);
+  });
+});
+
+describe("deriveProjectName", () => {
+  it("returns the basename of an absolute path", () => {
+    expect(deriveProjectName("/work/pi-app")).toBe("pi-app");
+    expect(deriveProjectName("/Users/mk/codespace/pi-agent")).toBe("pi-agent");
+  });
+
+  it("trims trailing slashes and falls back when only root is provided", () => {
+    expect(deriveProjectName("/work/pi-app/")).toBe("pi-app");
+    expect(deriveProjectName("/")).toBe(PROJECT_NAME_FALLBACK);
+    expect(deriveProjectName(".")).toBe(PROJECT_NAME_FALLBACK);
+  });
+
+  it("falls back when cwd is empty or nullish", () => {
+    expect(deriveProjectName("")).toBe(PROJECT_NAME_FALLBACK);
+    expect(deriveProjectName("   ")).toBe(PROJECT_NAME_FALLBACK);
+    expect(deriveProjectName(null)).toBe(PROJECT_NAME_FALLBACK);
+    expect(deriveProjectName(undefined)).toBe(PROJECT_NAME_FALLBACK);
+  });
+});
+
+describe("buildHistoryItems projectName", () => {
+  it("exposes a projectName field derived from cwd", () => {
+    const sessions = [
+      baseSession({ id: "a", cwd: "/work/pi-app" }),
+      baseSession({ id: "b", cwd: "/Users/me/agent" }),
+    ];
+    const items = buildHistoryItems(sessions, {});
+    const byId = Object.fromEntries(items.map((i) => [i.sessionId, i]));
+    expect(byId.a.projectName).toBe("pi-app");
+    expect(byId.b.projectName).toBe("agent");
+  });
+
+  it("uses the fallback when cwd is missing", () => {
+    const sessions = [baseSession({ id: "x", cwd: "" })];
+    const [item] = buildHistoryItems(sessions, {});
+    expect(item.projectName).toBe(PROJECT_NAME_FALLBACK);
   });
 });
