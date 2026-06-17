@@ -219,6 +219,27 @@ slim_bundle() {
   echo "bundle node_modules slimmed: $before -> $(du -sh "$nm" | cut -f1)"
 }
 
+# Standalone tracing only pulls server runtime deps; bin/pi.js needs pi-coding-agent.
+ensure_pi_cli_deps() {
+  local ver cli
+  ver="$(node -e "console.log(require('$ROOT/package.json').dependencies['@earendil-works/pi-coding-agent'])")"
+  cli="$PI_WEB_RES/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
+  if [[ -f "$cli" ]]; then
+    echo "pi-coding-agent CLI already present in bundle"
+    return 0
+  fi
+  echo "installing pi-coding-agent@${ver} for bundled pi CLI..."
+  (
+    cd "$PI_WEB_RES"
+    npm install --omit=dev --ignore-scripts --no-package-lock "@earendil-works/pi-coding-agent@${ver}"
+  )
+  if [[ ! -f "$cli" ]]; then
+    echo "error: pi-coding-agent CLI missing after ensure_pi_cli_deps ($cli)" >&2
+    exit 1
+  fi
+  echo "bundled pi-coding-agent CLI: $(node -e "console.log(require('$PI_WEB_RES/node_modules/@earendil-works/pi-coding-agent/package.json').version)")"
+}
+
 build_production_next
 
 rm -rf "$APP"
@@ -238,8 +259,11 @@ rsync -a --exclude '**/*.map' "$ROOT/.next/static/" "$PI_WEB_RES/.next/static/"
 rsync -a "$ROOT/public" "$PI_WEB_RES/"
 # 3) launcher (bin/pi-app.js detects server.js and runs it directly).
 rsync -a "$ROOT/bin" "$PI_WEB_RES/"
+mkdir -p "$PI_WEB_RES/scripts"
+cp "$ROOT/scripts/install-pi-cli-from-app.mjs" "$ROOT/scripts/cli-link-common.mjs" "$PI_WEB_RES/scripts/"
 
 embed_node
+ensure_pi_cli_deps
 slim_bundle
 chmod +x "$PI_WEB_RES/bin/pi-app.js" 2>/dev/null || true
 # Compat symlink for any older Swift build that still looks up the old name.
