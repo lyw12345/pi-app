@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.8.9] - 2026-06-17
+
+**Bundle:** `0.8.9p0.79.9` (pi-app + `@livos/pi-coding-agent`)
+
+### Changed
+- **pi 引擎来源**：DMG / npm 包改为通过 npm alias 使用 `@livos/pi-*@0.79.9`（`@earendil-works/*` import 不变）；`sync-pi-deps.sh` 从 `@livos` 取版本。
+
 ## [0.8.8] - 2026-06-17
 
 **Bundle:** `0.8.8p0.79.6` (pi-app + `@earendil-works/pi-coding-agent`)
