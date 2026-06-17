@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useMemo, type CSSProperties, type PointerEvent } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SessionSidebar } from "./SessionSidebar";
 import { ChatWindow } from "./ChatWindow";
@@ -31,27 +31,16 @@ import {
   resolveFilePreviewKind,
 } from "@/lib/file-preview";
 import { cachePiWebPreferences } from "@/lib/pi-web-preferences-cache";
+import {
+  usePanelResize,
+  MIN_LEFT_SIDEBAR_WIDTH,
+  MIN_RIGHT_PANEL_WIDTH,
+} from "@/hooks/usePanelResize";
 
-const LEFT_SIDEBAR_WIDTH_STORAGE_KEY = "pi-web:left-sidebar-width";
-const RIGHT_PANEL_WIDTH_STORAGE_KEY = "pi-web:right-panel-width";
-const DEFAULT_LEFT_SIDEBAR_WIDTH = 260;
-const DEFAULT_RIGHT_PANEL_WIDTH = 520;
-const MIN_LEFT_SIDEBAR_WIDTH = 220;
-const MIN_RIGHT_PANEL_WIDTH = 300;
-const MIN_CENTER_WIDTH = 360;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function readStoredPanelWidth(key: string, fallback: number, min: number): number {
-  if (typeof window === "undefined") return fallback;
-  const raw = window.localStorage.getItem(key);
-  if (!raw) return fallback;
-  const stored = Number(raw);
-  const max = Math.max(min, window.innerWidth - MIN_CENTER_WIDTH);
-  return Number.isFinite(stored) ? clamp(stored, min, max) : fallback;
-}
+// Above the sidebar (z 200) and the file-panel toggle (z 300): covers everything
+// while a drag is in progress so the file-preview iframe can't swallow pointer
+// events and the col-resize cursor stays consistent.
+const DRAG_OVERLAY_Z_INDEX = 1000;
 
 export function AppShell() {
   const router = useRouter();
@@ -73,7 +62,6 @@ export function AppShell() {
   const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
   const [skillsConfigOpen, setSkillsConfigOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState(0.4);
   const terminalCwd = useMemo(() => selectedSession?.cwd ?? null, [selectedSession]);
@@ -160,63 +148,19 @@ export function AppShell() {
   const [fileTabs, setFileTabs] = useState<Tab[]>([]);
   const [activeFileTabId, setActiveFileTabId] = useState<string | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [rightPanelWidth, setRightPanelWidth] = useState(DEFAULT_RIGHT_PANEL_WIDTH);
-  const [resizingPanel, setResizingPanel] = useState<"left" | "right" | null>(null);
+  const {
+    sidebarWidth,
+    rightPanelWidth,
+    resizingPanel,
+    sidebarMaxWidth,
+    rightPanelMaxWidth,
+    beginPanelResize,
+    handlePanelResizeKeyDown,
+  } = usePanelResize({ sidebarOpen, rightPanelOpen });
 
   const handleAtMention = useCallback((relativePath: string) => {
     chatInputRef.current?.insertText("`" + relativePath + "`");
   }, []);
-
-  useEffect(() => {
-    setSidebarWidth(readStoredPanelWidth(LEFT_SIDEBAR_WIDTH_STORAGE_KEY, DEFAULT_LEFT_SIDEBAR_WIDTH, MIN_LEFT_SIDEBAR_WIDTH));
-    setRightPanelWidth(readStoredPanelWidth(RIGHT_PANEL_WIDTH_STORAGE_KEY, DEFAULT_RIGHT_PANEL_WIDTH, MIN_RIGHT_PANEL_WIDTH));
-  }, []);
-
-  const getMaxPanelWidth = useCallback((minWidth: number, oppositePanelWidth: number) => {
-    if (typeof window === "undefined") return Math.max(minWidth, DEFAULT_RIGHT_PANEL_WIDTH);
-    return Math.max(minWidth, window.innerWidth - oppositePanelWidth - MIN_CENTER_WIDTH);
-  }, []);
-
-  const beginPanelResize = useCallback((panel: "left" | "right", event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-
-    const minWidth = panel === "left" ? MIN_LEFT_SIDEBAR_WIDTH : MIN_RIGHT_PANEL_WIDTH;
-    const oppositePanelWidth = panel === "left"
-      ? (rightPanelOpen ? rightPanelWidth : 0)
-      : (sidebarOpen ? sidebarWidth : 0);
-    const maxWidth = getMaxPanelWidth(minWidth, oppositePanelWidth);
-    const storageKey = panel === "left" ? LEFT_SIDEBAR_WIDTH_STORAGE_KEY : RIGHT_PANEL_WIDTH_STORAGE_KEY;
-    let latestWidth = panel === "left" ? sidebarWidth : rightPanelWidth;
-    const previousCursor = document.body.style.cursor;
-    const previousUserSelect = document.body.style.userSelect;
-
-    setResizingPanel(panel);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
-      const rawWidth = panel === "left" ? moveEvent.clientX : window.innerWidth - moveEvent.clientX;
-      const nextWidth = clamp(Math.round(rawWidth), minWidth, maxWidth);
-      latestWidth = nextWidth;
-      if (panel === "left") setSidebarWidth(nextWidth);
-      else setRightPanelWidth(nextWidth);
-    };
-
-    const finishResize = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", finishResize);
-      window.removeEventListener("pointercancel", finishResize);
-      document.body.style.cursor = previousCursor;
-      document.body.style.userSelect = previousUserSelect;
-      setResizingPanel(null);
-      window.localStorage.setItem(storageKey, String(latestWidth));
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", finishResize, { once: true });
-    window.addEventListener("pointercancel", finishResize, { once: true });
-  }, [getMaxPanelWidth, rightPanelOpen, rightPanelWidth, sidebarOpen, sidebarWidth]);
 
   const [initialSessionId] = useState<string | null>(() => searchParams.get("session"));
   const [activeCwd, setActiveCwd] = useState<string | null>(null);
@@ -601,10 +545,15 @@ export function AppShell() {
           <div
             className="panel-resize-handle sidebar-resize-handle"
             role="separator"
+            tabIndex={0}
             aria-orientation="vertical"
             aria-label="Resize sidebar"
+            aria-valuenow={sidebarWidth}
+            aria-valuemin={MIN_LEFT_SIDEBAR_WIDTH}
+            aria-valuemax={sidebarMaxWidth}
             title="Resize sidebar"
             onPointerDown={(event) => beginPanelResize("left", event)}
+            onKeyDown={(event) => handlePanelResizeKeyDown("left", event)}
           />
         )}
       </div>
@@ -884,10 +833,15 @@ export function AppShell() {
           <div
             className="panel-resize-handle right-panel-resize-handle"
             role="separator"
+            tabIndex={0}
             aria-orientation="vertical"
             aria-label="Resize file panel"
+            aria-valuenow={rightPanelWidth}
+            aria-valuemin={MIN_RIGHT_PANEL_WIDTH}
+            aria-valuemax={rightPanelMaxWidth}
             title="Resize file panel"
             onPointerDown={(event) => beginPanelResize("right", event)}
+            onKeyDown={(event) => handlePanelResizeKeyDown("right", event)}
           />
         )}
         <div className="right-panel-content">
@@ -922,6 +876,14 @@ export function AppShell() {
         </div>
       </div>
     </div>
+    {/* Transparent overlay during a drag: stops the file-preview iframe from
+        swallowing pointer events and keeps a consistent col-resize cursor. */}
+    {resizingPanel && (
+      <div
+        aria-hidden="true"
+        style={{ position: "fixed", inset: 0, zIndex: DRAG_OVERLAY_Z_INDEX, cursor: "col-resize" }}
+      />
+    )}
     {/* File panel toggle — always visible at top-right */}
     <button
       onClick={() => setRightPanelOpen((v) => !v)}
