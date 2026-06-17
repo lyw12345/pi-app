@@ -31,12 +31,14 @@ describe("POST /api/cwd/validate", () => {
     if (prevAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = prevAgentDir;
     for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+    globalThis.__piAllowedRootsCache = undefined;
     vi.clearAllMocks();
   });
 
-  it("records a validated workspace as recently opened", async () => {
+  it("records a validated workspace and invalidates the allowed-roots cache", async () => {
     const workspace = mkdtempSync(join(tmpdir(), "pi-validate-ws-"));
     tmpDirs.push(workspace);
+    globalThis.__piAllowedRootsCache = { roots: new Set(["/stale"]), expiresAt: Date.now() + 10_000 };
 
     const { POST } = await import("./route");
     const res = await POST(postCwd(workspace));
@@ -44,6 +46,7 @@ describe("POST /api/cwd/validate", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ success: true, cwd: workspace });
     expect(loadPiWebPreferences().recentWorkspaceCwds).toContain(workspace);
+    expect(globalThis.__piAllowedRootsCache).toBeUndefined();
   });
 
   it("rejects a path that does not exist", async () => {

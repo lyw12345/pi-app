@@ -7,6 +7,7 @@ import { filePathFromSegments, isPathAllowed, isRealPathAllowed, isReferencedFil
 import { getAgentDir } from "@/lib/agent-dir";
 import { requireApiAuth } from "@/lib/api-auth";
 import { loadPiWebPreferences } from "@/lib/pi-web-preferences";
+import { getCachedAllowedRoots, setCachedAllowedRoots } from "@/lib/allowed-roots-cache";
 
 const IGNORED_NAMES = new Set([
   "node_modules", ".git", ".next", "dist", "build", "__pycache__",
@@ -92,16 +93,6 @@ function getLanguage(filePath: string): string {
   return EXT_TO_LANGUAGE[ext] ?? "text";
 }
 
-// Short-TTL cache for the allowed-roots set. Without this, every file list/read
-// request re-scans every pi session on disk just to check access. 5s is short
-// enough that newly-created cwds appear promptly; stored on globalThis so it
-// survives Next.js hot-reload.
-declare global {
-  var __piAllowedRootsCache: { roots: Set<string>; expiresAt: number } | undefined;
-}
-
-const ALLOWED_ROOTS_TTL_MS = 5_000;
-
 function expandHomePath(p: string, home: string): string {
   if (p === "~") return home;
   if (p.startsWith("~/") || p.startsWith("~\\")) return path.join(home, p.slice(2));
@@ -110,8 +101,8 @@ function expandHomePath(p: string, home: string): string {
 
 async function getAllowedRoots(): Promise<Set<string>> {
   const now = Date.now();
-  const cached = globalThis.__piAllowedRootsCache;
-  if (cached && cached.expiresAt > now) return cached.roots;
+  const cached = getCachedAllowedRoots(now);
+  if (cached) return cached;
 
   const sessions = await listAllSessions();
   const roots = new Set<string>();
@@ -143,7 +134,7 @@ async function getAllowedRoots(): Promise<Set<string>> {
     // ignore if home is unreadable
   }
 
-  globalThis.__piAllowedRootsCache = { roots, expiresAt: now + ALLOWED_ROOTS_TTL_MS };
+  setCachedAllowedRoots(roots, now);
   return roots;
 }
 
