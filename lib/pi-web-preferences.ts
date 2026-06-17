@@ -6,6 +6,10 @@ export type ToolMode = "simple" | "default" | "full";
 
 export interface PiWebPreferences {
   defaultWorkspaceCwd?: string;
+  /** Directories the user explicitly opened, most-recent-first. Lets the file
+   *  API authorize them and the project picker list them before any session
+   *  exists for that directory. */
+  recentWorkspaceCwds?: string[];
   toolMode?: ToolMode;
   notificationsEnabled?: boolean;
   /** When true, in-session branch switches call navigate_tree with summarize (default off). */
@@ -48,4 +52,21 @@ export function mergePiWebPreferences(patch: Partial<PiWebPreferences>): PiWebPr
 
 export function defaultToolMode(): ToolMode {
   return loadPiWebPreferences().toolMode ?? "full";
+}
+
+export const MAX_RECENT_WORKSPACE_CWDS = 20;
+
+/**
+ * Record a directory the user explicitly opened so it can be authorized by the
+ * file API and surfaced in the project picker even before it has a saved
+ * session. Stored most-recent-first, de-duplicated, and capped.
+ */
+export function rememberWorkspaceCwd(cwd: string): PiWebPreferences {
+  const trimmed = cwd.trim();
+  if (!trimmed) return loadPiWebPreferences();
+  const current = loadPiWebPreferences();
+  const previous = current.recentWorkspaceCwds ?? [];
+  const recentWorkspaceCwds = [trimmed, ...previous.filter((entry) => entry !== trimmed)]
+    .slice(0, MAX_RECENT_WORKSPACE_CWDS);
+  return savePiWebPreferences({ ...current, recentWorkspaceCwds });
 }

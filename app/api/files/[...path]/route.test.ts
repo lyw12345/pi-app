@@ -3,6 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { PI_WEB_PREFERENCES_FILENAME } from "@/lib/pi-web-preferences";
 
 const roots = vi.hoisted(() => ({
   sessionCwd: "",
@@ -64,6 +65,44 @@ describe("GET /api/files/[...path]", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ content: "visible", language: "text" });
+  });
+
+  it("allows the configured default workspace before it has any saved session", async () => {
+    const workspace = makeTempDir("pi-files-default-ws-");
+    writeFileSync(
+      join(roots.agentDir, PI_WEB_PREFERENCES_FILENAME),
+      JSON.stringify({ defaultWorkspaceCwd: workspace }),
+    );
+
+    const { GET } = await import("./route");
+    const filePath = join(workspace, "readme.md");
+    writeFileSync(filePath, "hello");
+
+    const res = await GET(requestFor(filePath), {
+      params: Promise.resolve({ path: pathSegments(filePath) }),
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ content: "hello" });
+  });
+
+  it("allows a recently opened workspace before it has any saved session", async () => {
+    const workspace = makeTempDir("pi-files-recent-ws-");
+    writeFileSync(
+      join(roots.agentDir, PI_WEB_PREFERENCES_FILENAME),
+      JSON.stringify({ recentWorkspaceCwds: [workspace] }),
+    );
+
+    const { GET } = await import("./route");
+    const filePath = join(workspace, "note.md");
+    writeFileSync(filePath, "recent");
+
+    const res = await GET(requestFor(filePath), {
+      params: Promise.resolve({ path: pathSegments(filePath) }),
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ content: "recent" });
   });
 
   it("rejects existing files outside allowed roots", async () => {

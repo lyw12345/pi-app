@@ -56,13 +56,12 @@ export async function listProjectCwdsForPicker(): Promise<string[]> {
   }
 
   const cwds = getPickerCwds(merged);
-  const defaultWorkspaceCwd = loadPiWebPreferences().defaultWorkspaceCwd?.trim();
-  if (
-    defaultWorkspaceCwd &&
-    !cwds.includes(defaultWorkspaceCwd) &&
-    !isSystemTempCwd(defaultWorkspaceCwd)
-  ) {
-    cwds.push(defaultWorkspaceCwd);
+  const prefs = loadPiWebPreferences();
+  for (const raw of [prefs.defaultWorkspaceCwd, ...(prefs.recentWorkspaceCwds ?? [])]) {
+    const cwd = raw?.trim();
+    if (cwd && !cwds.includes(cwd) && !isSystemTempCwd(cwd)) {
+      cwds.push(cwd);
+    }
   }
   return cwds;
 }

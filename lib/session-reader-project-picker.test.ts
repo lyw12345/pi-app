@@ -89,4 +89,17 @@ describe("listProjectCwdsForPicker", () => {
     expect(cwds).toContain("/Users/mk/pi-cwd-20260603");
     expect(cwds).toContain("/Users/mk/codespace/pi-web");
   });
+
+  it("surfaces recently opened workspaces that have no session yet", async () => {
+    prefsMock.mockReturnValue({ recentWorkspaceCwds: ["/Users/mk/scratch/new-proj"] });
+    listAllMock.mockResolvedValue([
+      { cwd: "/Users/mk/codespace/pi-web", modified: new Date("2026-06-02") },
+    ]);
+
+    const { listProjectCwdsForPicker } = await import("./session-reader");
+    const cwds = await listProjectCwdsForPicker();
+
+    expect(cwds).toContain("/Users/mk/scratch/new-proj");
+    expect(cwds).toContain("/Users/mk/codespace/pi-web");
+  });
 });

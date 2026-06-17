@@ -6,6 +6,7 @@ import { collectSessionReferencedFiles, listAllSessions } from "@/lib/session-re
 import { filePathFromSegments, isPathAllowed, isRealPathAllowed, isReferencedFileAllowed, parseByteRange } from "@/lib/file-access";
 import { getAgentDir } from "@/lib/agent-dir";
 import { requireApiAuth } from "@/lib/api-auth";
+import { loadPiWebPreferences } from "@/lib/pi-web-preferences";
 
 const IGNORED_NAMES = new Set([
   "node_modules", ".git", ".next", "dist", "build", "__pycache__",
@@ -101,6 +102,12 @@ declare global {
 
 const ALLOWED_ROOTS_TTL_MS = 5_000;
 
+function expandHomePath(p: string, home: string): string {
+  if (p === "~") return home;
+  if (p.startsWith("~/") || p.startsWith("~\\")) return path.join(home, p.slice(2));
+  return p;
+}
+
 async function getAllowedRoots(): Promise<Set<string>> {
   const now = Date.now();
   const cached = globalThis.__piAllowedRootsCache;
@@ -112,8 +119,20 @@ async function getAllowedRoots(): Promise<Set<string>> {
     if (s.cwd) roots.add(s.cwd);
   }
   roots.add(getAgentDir());
-  // Also allow ~/pi-cwd-* directories created by the default-cwd endpoint
+
   const home = os.homedir();
+  // Allow workspaces the user explicitly opened — the configured default and any
+  // recently opened directory — even before they have a saved session on disk.
+  // Without this, selecting such a project shows an empty file explorer until
+  // the first message is sent (when the cwd first lands in a session file and
+  // therefore in the allowed roots).
+  const prefs = loadPiWebPreferences();
+  for (const raw of [prefs.defaultWorkspaceCwd, ...(prefs.recentWorkspaceCwds ?? [])]) {
+    const trimmed = raw?.trim();
+    if (trimmed) roots.add(expandHomePath(trimmed, home));
+  }
+
+  // Also allow ~/pi-cwd-* directories created by the default-cwd endpoint
   try {
     for (const name of readdirSync(home)) {
       if (/^pi-cwd-\d{8}$/.test(name)) {
