@@ -219,25 +219,32 @@ slim_bundle() {
   echo "bundle node_modules slimmed: $before -> $(du -sh "$nm" | cut -f1)"
 }
 
-# Standalone tracing only pulls server runtime deps; bin/pi.js needs pi-coding-agent.
+# Standalone tracing pulls server-used files from pi-coding-agent but not dist/cli.js.
+# Merge the CLI package from the dev tree — never `npm install` in the bundle (that
+# reinstalls the entire pi-app dependency graph and blows the DMG past 400M).
 ensure_pi_cli_deps() {
-  local ver cli
-  ver="$(node -e "console.log(require('$ROOT/package.json').dependencies['@earendil-works/pi-coding-agent'])")"
-  cli="$PI_WEB_RES/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
-  if [[ -f "$cli" ]]; then
-    echo "pi-coding-agent CLI already present in bundle"
-    return 0
+  local src="$ROOT/node_modules/@earendil-works/pi-coding-agent"
+  local dest="$PI_WEB_RES/node_modules/@earendil-works/pi-coding-agent"
+  local cli="$dest/dist/cli.js"
+
+  if [[ ! -d "$src" ]]; then
+    echo "error: pi-coding-agent not found at $src — run npm install in pi-app" >&2
+    exit 1
   fi
-  echo "installing pi-coding-agent@${ver} for bundled pi CLI..."
-  (
-    cd "$PI_WEB_RES"
-    npm install --omit=dev --ignore-scripts --no-package-lock "@earendil-works/pi-coding-agent@${ver}"
-  )
+
+  echo "merging pi-coding-agent CLI into bundle (rsync, no npm install)..."
+  mkdir -p "$(dirname "$dest")"
+  rsync -a \
+    --exclude 'node_modules' \
+    --exclude 'docs' \
+    --exclude 'examples' \
+    "$src/" "$dest/"
+
   if [[ ! -f "$cli" ]]; then
     echo "error: pi-coding-agent CLI missing after ensure_pi_cli_deps ($cli)" >&2
     exit 1
   fi
-  echo "bundled pi-coding-agent CLI: $(node -e "console.log(require('$PI_WEB_RES/node_modules/@earendil-works/pi-coding-agent/package.json').version)")"
+  echo "bundled pi-coding-agent CLI: $(node -e "console.log(require('$dest/package.json').version)")"
 }
 
 build_production_next

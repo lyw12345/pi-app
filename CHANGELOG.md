@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+## [0.8.8] - 2026-06-17
+
+**Bundle:** `0.8.8p0.79.6` (pi-app + `@earendil-works/pi-coding-agent`)
+
+### Fixed
+- **Pi.app 打包体积**：`ensure_pi_cli_deps` 误在 bundle 内执行完整 `npm install`，DMG 膨胀至 ~406M；改为从开发树 rsync `pi-coding-agent` 的 `dist/`（排除嵌套 `node_modules`），恢复 ~90M 档 DMG。
+
 ## [0.8.7] - 2026-06-17
 
 **Bundle:** `0.8.7p0.79.6` (pi-app + `@earendil-works/pi-coding-agent`)
