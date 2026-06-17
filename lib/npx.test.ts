@@ -1,5 +1,6 @@
 import { describe, expect, it, afterEach } from "vitest";
-import { delimiter, dirname } from "path";
+import { dirname } from "path";
+import { existsSync } from "fs";
 import { execPath } from "process";
 import { buildNpxEnv } from "./npx";
 
@@ -24,7 +25,7 @@ describe("buildNpxEnv", () => {
 
   it("includes Homebrew node when present on this machine", () => {
     const env = buildNpxEnv({ ...process.env, PATH: "/usr/bin:/bin" });
-    if (require("fs").existsSync("/opt/homebrew/bin/node")) {
+    if (existsSync("/opt/homebrew/bin/node")) {
       expect(env.PATH).toContain("/opt/homebrew/bin");
     }
   });
