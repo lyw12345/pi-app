@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+## [0.8.8] - 2026-06-17
+
+**Bundle:** `0.8.8p0.79.6` (pi-app + `@earendil-works/pi-coding-agent`)
+
+### Fixed
+- **Pi.app 打包体积**：`ensure_pi_cli_deps` 误在 bundle 内执行完整 `npm install`，DMG 膨胀至 ~406M；改为从开发树 rsync `pi-coding-agent` 的 `dist/`（排除嵌套 `node_modules`），恢复 ~90M 档 DMG。
+
+## [0.8.7] - 2026-06-17
+
+**Bundle:** `0.8.7p0.79.6` (pi-app + `@earendil-works/pi-coding-agent`)
+
+### Added
+- **Pi.app 全局 `pi` CLI**：App 启动时自动安装或更新全局 `pi` 命令（已有 `pi` 时原地刷新 shim，默认 `~/.local/bin/pi`）。`scripts/install-pi-cli-from-app.mjs` + `ServerManager` 首次启动钩子。
+
+### Fixed
+- **Skills 安装（Pi.app）**：从 Dock/Finder 启动时 PATH 不含 Homebrew，`npx skills add` 报 `env: node: No such file or directory`；`lib/npx.ts` 与 `ServerManager` 为子进程补全 node 目录。
+- **Pi.app 打包**：standalone 追踪不含 `pi-coding-agent`，导致全局 `pi` 无法运行；`package-macos-app.sh` 增加 `ensure_pi_cli_deps`。
+
+### Changed
+- **pi engine**：`@earendil-works/pi-coding-agent` / `pi-ai` 0.79.3 → **0.79.6**。
+
 ## [0.8.0] - 2026-06-11
 
 ### Added

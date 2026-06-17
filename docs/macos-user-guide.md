@@ -8,6 +8,8 @@
 
 无需单独安装 Node.js；App 内嵌运行时与 pi-web 构建产物。
 
+**终端 `pi` 命令**：Pi.app 首次启动时会自动安装或更新全局 `pi` CLI（写入已有 `pi` 的路径，或 `~/.local/bin/pi`）。新开一个终端后执行 `pi --help` 验证。若 `~/.local/bin` 不在 PATH 中，请将其加入 shell 配置（例如 `export PATH="$HOME/.local/bin:$PATH"`）。
+
 ## 工作区
 
 - 设置中选择的文件夹即 pi 的 **cwd（工作区）**（macOS 壳可调 `pickWorkspaceDirectory`）。

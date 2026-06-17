@@ -59,6 +59,7 @@ final class ServerManager: ObservableObject {
     state = .starting
     stop()
     terminateStaleListenersOnPort()
+    installGlobalPiCli()
     if let message = spawn() {
       state = .failed(message)
       return
@@ -136,6 +137,28 @@ final class ServerManager: ObservableObject {
     }
   }
 
+  /// Install or refresh the global `pi` CLI shim (Pi.app bundle → user PATH).
+  private func installGlobalPiCli() {
+    guard Self.isAppBundle(), let nodeURL else { return }
+    let script = piWebRoot.appendingPathComponent("scripts/install-pi-cli-from-app.mjs")
+    guard FileManager.default.fileExists(atPath: script.path) else { return }
+
+    let proc = Process()
+    proc.executableURL = nodeURL
+    proc.arguments = [
+      script.path,
+      "--pi-web-root", piWebRoot.path,
+      "--node", nodeURL.path,
+    ]
+    proc.standardOutput = FileHandle.nullDevice
+    proc.standardError = FileHandle.nullDevice
+    do {
+      try proc.run()
+    } catch {
+      // Best effort — Pi.app works without a global `pi` command.
+    }
+  }
+
   /// Returns an error message on failure, nil on success.
   private func spawn() -> String? {
     let script = piWebRoot.appendingPathComponent("bin/pi-app.js")
@@ -157,6 +180,21 @@ final class ServerManager: ObservableObject {
     env["HOST"] = host
     env["PORT"] = String(port)
     env["NODE"] = nodeURL.path
+    // Finder/Dock launches often omit Homebrew from PATH; child processes that
+    // use `#!/usr/bin/env node` (e.g. npx skills add) need node discoverable.
+    let nodeBinDir = nodeURL.deletingLastPathComponent().path
+    var pathPrefix = nodeBinDir
+    for brewBin in ["/opt/homebrew/bin", "/usr/local/bin"] {
+      if FileManager.default.isExecutableFile(atPath: "\(brewBin)/node") {
+        pathPrefix = "\(brewBin):\(nodeBinDir)"
+        break
+      }
+    }
+    if let existing = env["PATH"], !existing.isEmpty {
+      env["PATH"] = "\(pathPrefix):\(existing)"
+    } else {
+      env["PATH"] = "\(pathPrefix):/usr/bin:/bin:/usr/sbin:/sbin"
+    }
     proc.environment = env
     proc.currentDirectoryURL = piWebRoot
     do {

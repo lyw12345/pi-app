@@ -1,7 +1,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { existsSync } from "fs";
-import { dirname, join } from "path";
+import { delimiter, dirname, join } from "path";
 import { execPath } from "process";
 
 const execFileAsync = promisify(execFile);
@@ -38,6 +38,47 @@ function findNpxCli(): string | null {
   return null;
 }
 
+/** Directories that must be on PATH so `#!/usr/bin/env node` wrappers spawned by npx can run. */
+function nodeBinDirs(): string[] {
+  const dirs: string[] = [];
+  const seen = new Set<string>();
+  const add = (dir: string | undefined) => {
+    if (!dir || seen.has(dir)) return;
+    seen.add(dir);
+    dirs.push(dir);
+  };
+
+  add(dirname(execPath));
+  const nodeEnv = process.env.NODE;
+  if (nodeEnv) add(dirname(nodeEnv));
+
+  // Pi.app is often launched from Finder/Dock with a minimal PATH that omits
+  // Homebrew; npx still needs `node` on PATH for package bin scripts.
+  for (const prefix of ["/opt/homebrew/bin", "/usr/local/bin"]) {
+    try {
+      if (existsSync(join(prefix, "node"))) add(prefix);
+    } catch {
+      // ignore
+    }
+  }
+
+  return dirs;
+}
+
+function augmentEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env = { ...base };
+  const prefix = nodeBinDirs().join(delimiter);
+  if (!prefix) return env;
+  const existing = env.PATH ?? "";
+  env.PATH = existing ? `${prefix}${delimiter}${existing}` : prefix;
+  return env;
+}
+
+/** @internal Exported for unit tests only. */
+export function buildNpxEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return augmentEnv(base);
+}
+
 export interface RunNpxOptions {
   timeout?: number;
   cwd?: string;
@@ -61,6 +102,6 @@ export async function runNpx(args: string[], opts: RunNpxOptions = {}): Promise<
   return execFileAsync(command, commandArgs, {
     timeout: opts.timeout,
     cwd: opts.cwd,
-    env: opts.env,
+    env: augmentEnv(opts.env),
   });
 }
