@@ -291,8 +291,8 @@ span.linenumber {
     transition: width 0.2s ease, min-width 0.2s ease;
   }
   .sidebar-container.sidebar-open {
-    width: 260px;
-    min-width: 260px;
+    width: var(--sidebar-width, 260px);
+    min-width: var(--sidebar-width, 260px);
   }
   .sidebar-container.sidebar-closed {
     width: 0;
@@ -300,9 +300,13 @@ span.linenumber {
     border-right: none !important;
   }
   /* keep inner content at fixed width so it doesn't reflow during animation */
-  .sidebar-container > * {
-    width: 260px;
-    min-width: 260px;
+  .sidebar-container > .sidebar-content {
+    width: var(--sidebar-width, 260px);
+    min-width: var(--sidebar-width, 260px);
+    height: 100%;
+  }
+  .sidebar-container.is-resizing {
+    transition: none;
   }
 }
 
@@ -310,13 +314,14 @@ span.linenumber {
 /* Right panel: animate width */
 @media (min-width: 641px) {
   .right-panel-container {
+    position: relative;
     overflow: hidden;
     transition: width 0.2s ease, min-width 0.2s ease;
     flex-shrink: 0;
   }
   .right-panel-container.right-panel-open {
-    width: 42%;
-    min-width: 300px;
+    width: var(--right-panel-width, 520px);
+    min-width: var(--right-panel-width, 520px);
   }
   .right-panel-container.right-panel-closed {
     width: 0;
@@ -324,9 +329,47 @@ span.linenumber {
     border-left: none !important;
   }
   /* keep inner content at fixed width so it doesn't reflow during animation */
-  .right-panel-container > * {
-    width: 42vw;
-    min-width: 300px;
+  .right-panel-container > .right-panel-content {
+    display: flex;
+    flex-direction: column;
+    width: var(--right-panel-width, 520px);
+    min-width: var(--right-panel-width, 520px);
+    height: 100%;
+  }
+  .right-panel-container.is-resizing {
+    transition: none;
+  }
+  .panel-resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 30;
+    width: 8px;
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .panel-resize-handle::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 1px;
+    background: transparent;
+    transition: background 0.12s ease, box-shadow 0.12s ease;
+  }
+  .panel-resize-handle:hover::after,
+  .panel-resize-handle:focus-visible::after,
+  .sidebar-container.is-resizing .sidebar-resize-handle::after,
+  .right-panel-container.is-resizing .right-panel-resize-handle::after {
+    background: var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .sidebar-resize-handle {
+    right: 0;
+  }
+  .right-panel-resize-handle {
+    left: 0;
   }
 }
 
@@ -369,6 +412,9 @@ span.linenumber {
     width: 0 !important;
     min-width: 0 !important;
     border-left: none !important;
+    display: none !important;
+  }
+  .panel-resize-handle {
     display: none !important;
   }
 }
