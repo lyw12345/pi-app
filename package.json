@@ -1,6 +1,6 @@
 {
   "name": "pi-app",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "description": "Web UI for the pi coding agent",
   "license": "MIT",
   "homepage": "https://github.com/asiachrispy/pi-app",
@@ -57,8 +57,8 @@
     "prepublishOnly": "node_modules/.bin/tsc --noEmit && node_modules/.bin/vitest run"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "0.79.6",
-    "@earendil-works/pi-coding-agent": "0.79.6",
+    "@earendil-works/pi-ai": "npm:@livos/pi-ai@0.79.9",
+    "@earendil-works/pi-coding-agent": "npm:@livos/pi-coding-agent@0.79.9",
     "@lobehub/icons": "5.10.0",
     "@types/react-syntax-highlighter": "15.5.13",
     "katex": "0.17.0",
@@ -93,6 +93,8 @@
     "vitest": "4.1.8"
   },
   "overrides": {
+    "@earendil-works/pi-agent-core": "npm:@livos/pi-agent-core@0.79.9",
+    "@earendil-works/pi-tui": "npm:@livos/pi-tui@0.79.9",
     "js-cookie": "3.0.8",
     "mermaid": "11.15.0"
   }

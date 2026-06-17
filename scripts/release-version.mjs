@@ -41,17 +41,29 @@ function npmView(pkg, field) {
 	}
 }
 
+function parsePinVersion(spec) {
+	const s = String(spec ?? "");
+	const alias = s.match(/@(\d+\.\d+\.\d+)$/);
+	if (alias) return alias[1];
+	return s.replace(/^[\^~]/, "");
+}
+
+function getInstalledPiMeta() {
+	if (!existsSync(PI_PKG)) return { name: "@earendil-works/pi-coding-agent", version: null };
+	const pkg = readJson(PI_PKG);
+	return { name: pkg.name ?? "@earendil-works/pi-coding-agent", version: pkg.version ?? null };
+}
+
 export function getVersions() {
 	const pkg = readJson(PKG_PATH);
 	const appVersion = pkg.version ?? "0.0.0";
-	const pinnedPi = String(pkg.dependencies?.["@earendil-works/pi-coding-agent"] ?? "").replace(/^[\^~]/, "");
-	let installedPi = null;
-	if (existsSync(PI_PKG)) {
-		installedPi = readJson(PI_PKG).version ?? null;
-	}
-	const latestPi = npmView("@earendil-works/pi-coding-agent", "version");
+	const pinnedPi = parsePinVersion(pkg.dependencies?.["@earendil-works/pi-coding-agent"]);
+	const installed = getInstalledPiMeta();
+	const installedPi = installed.version;
+	const piPackage = installed.name;
+	const latestPi = npmView("@livos/pi-coding-agent", "version") ?? npmView("@earendil-works/pi-coding-agent", "version");
 	const bundle = `${appVersion}p${installedPi ?? pinnedPi ?? "?"}`;
-	return { appVersion, pinnedPi, installedPi, latestPi, bundle };
+	return { appVersion, pinnedPi, installedPi, piPackage, latestPi, bundle };
 }
 
 function check() {
@@ -63,8 +75,8 @@ function check() {
 		errors.push("package.json missing @earendil-works/pi-coding-agent dependency");
 	}
 	const pkg = readJson(PKG_PATH);
-	const piPin = String(pkg.dependencies?.["@earendil-works/pi-coding-agent"] ?? "").replace(/^[\^~]/, "");
-	const aiPin = String(pkg.dependencies?.["@earendil-works/pi-ai"] ?? "").replace(/^[\^~]/, "");
+	const piPin = parsePinVersion(pkg.dependencies?.["@earendil-works/pi-coding-agent"]);
+	const aiPin = parsePinVersion(pkg.dependencies?.["@earendil-works/pi-ai"]);
 	if (piPin && aiPin && piPin !== aiPin) {
 		errors.push(`pi-ai pin (${aiPin}) must match pi-coding-agent pin (${piPin})`);
 	}
@@ -73,7 +85,7 @@ function check() {
 		errors.push(`node_modules pi (${v.installedPi}) != package.json pin (${v.pinnedPi}) — run npm ci`);
 	}
 	if (v.latestPi && v.pinnedPi && v.pinnedPi !== v.latestPi) {
-		const msg = `pinned pi ${v.pinnedPi} is behind npm latest ${v.latestPi} — run npm run release:sync-pi-deps`;
+		const msg = `pinned pi ${v.pinnedPi} is behind @livos latest ${v.latestPi} — run npm run release:sync-pi-deps`;
 		if (args.has("--strict")) errors.push(msg);
 		else warnings.push(msg);
 	}
@@ -88,7 +100,7 @@ function notesHeader(v) {
 		`| Component | Version |`,
 		`|-----------|---------|`,
 		`| **pi-app** | \`${v.appVersion}\` |`,
-		`| **@earendil-works/pi-coding-agent** | \`${v.installedPi ?? v.pinnedPi}\` |`,
+		`| **${v.piPackage ?? "@earendil-works/pi-coding-agent"}** | \`${v.installedPi ?? v.pinnedPi}\` |`,
 		`| **Bundle id** (sidebar click) | \`${v.bundle}\` |`,
 		"",
 	].join("\n");
@@ -118,7 +130,7 @@ if (args.has("--check")) {
 	for (const e of errors) console.error(`error: ${e}`);
 	if (errors.length === 0) {
 		console.log(`ok: pi-app ${v.appVersion} + pi ${v.installedPi ?? v.pinnedPi} (bundle ${v.bundle})`);
-		if (v.latestPi) console.log(`npm latest pi: ${v.latestPi}`);
+		if (v.latestPi) console.log(`@livos latest pi: ${v.latestPi}`);
 	}
 	process.exit(errors.length > 0 ? 1 : 0);
 }
@@ -127,5 +139,5 @@ const v = getVersions();
 console.log(`pi-app:  ${v.appVersion}`);
 console.log(`pi pin:  ${v.pinnedPi || "(none)"}`);
 console.log(`pi inst: ${v.installedPi ?? "(not installed)"}`);
-console.log(`npm pi:  ${v.latestPi ?? "(unknown)"}`);
+console.log(`npm pi:  ${v.latestPi ?? "(unknown)"} (@livos)`);
 console.log(`bundle:  ${v.bundle}`);
