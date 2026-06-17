@@ -1,8 +1,8 @@
 # Changelog
 
-## [0.8.6] - 2026-06-17
+## [0.8.7] - 2026-06-17
 
-**Bundle:** `0.8.6p0.79.6` (pi-app + `@earendil-works/pi-coding-agent`)
+**Bundle:** `0.8.7p0.79.6` (pi-app + `@earendil-works/pi-coding-agent`)
 
 ### Added
 - **Pi.app 全局 `pi` CLI**：App 启动时自动安装或更新全局 `pi` 命令（已有 `pi` 时原地刷新 shim，默认 `~/.local/bin/pi`）。`scripts/install-pi-cli-from-app.mjs` + `ServerManager` 首次启动钩子。
